@@ -22,6 +22,7 @@ let camStream = null;
 let searchTimer = null;
 let sbClient = null;
 let realtimeChannel = null;
+let presenceChannel = null;
 
 const ADMIN_CODE = '*2006*';
 const MAX_RECENT_LOGINS = 5;
@@ -92,6 +93,9 @@ const i18n = {
     auth_switch_signin_link: 'Sign in',
     auth_switch_signup: 'New here? ',
     auth_switch_signup_link: 'Create account',
+    full_name: 'Full Name',
+    full_name_hint: 'Your real name, for display purposes.',
+    username_hint: 'Unique ID for payments (no spaces).',
     // Home
     good_day: 'Good day,',
     owed_to_you: 'Owes you',
@@ -120,7 +124,8 @@ const i18n = {
     others_can_scan_this_to_pay_you: 'Others can scan this to pay you.',
     no_transactions_yet: 'No transactions yet',
     language: 'Language',
-    all_clean: 'All clean'
+    all_clean_title: 'All clean',
+    all_clean_sub: 'No active debts.\nHit Pay or Borrow to get started.'
   },
   km: {
     // Auth
@@ -140,6 +145,9 @@ const i18n = {
     auth_switch_signin_link: 'ចូល',
     auth_switch_signup: 'អ្នក​ថ្មី​? ',
     auth_switch_signup_link: 'បង្កើតគណនី',
+    full_name: 'ឈ្មោះ​ពេញ',
+    full_name_hint: 'ឈ្មោះពិតរបស់អ្នកសម្រាប់បង្ហាញ។',
+    username_hint: 'ID សម្រាប់បង់ប្រាក់ (គ្មានដកឃ្លា)។',
     // Home
     good_day: 'សួស្តី,',
     owed_to_you: 'ជំពាក់អ្នក',
@@ -168,7 +176,14 @@ const i18n = {
     others_can_scan_this_to_pay_you: 'អ្នកផ្សេងទៀតអាចស្កេននេះដើម្បីបង់ប្រាក់ឱ្យអ្នក។',
     no_transactions_yet: 'មិនមានប្រតិបត្តិការណ៍ទេ',
     language: 'ភាសា',
-    all_clean: 'ទាំងអស់ត្រូវបានសម្រួល'
+    all_clean_title: 'ទាំងអស់ត្រូវបានសម្រួល',
+    all_clean_sub: 'គ្មានជំពាក់សកម្មទេ។\nចុចបង់ឬខ្ចីដើម្បីចាប់ផ្តើម។',
+    phone_number_disabled: 'លេខទូរស័ព្ទមិនអាចផ្លាស់ប្តូរបានទេ។',
+    save_changes: 'រក្សាទុកការផ្លាស់ប្តូរ',
+    cancel: 'បោះបង់',
+    you_owe_meta: 'អ្នកជំពាក់',
+    owes_you: 'ជំពាក់អ្នក',
+    paid_you: 'បានសងអ្នក',
   }
 };
 
@@ -202,6 +217,15 @@ function avatarHTML(name, photo, size) {
   const [bg,fg] = pals[(name||'').charCodeAt(0)%pals.length];
   const fs = Math.round(size*.38);
   return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${bg};color:${fg};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:${fs}px;flex-shrink:0;border:1.5px solid ${fg}33;letter-spacing:.03em">${initials}</div>`;
+}
+
+function playNotificationSound() {
+  // Browsers may prevent audio from playing without user interaction.
+  // We clone the node to allow for rapid-fire plays if needed.
+  const sound = NOTIFICATION_SOUND.cloneNode();
+  sound.play().catch(e => {
+    console.warn("Notification sound was blocked by the browser.", e);
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -429,11 +453,10 @@ function setLanguage(lang) {
 function logout() {
   if (camStream) { camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
   localStorage.removeItem('tabify_session');
+  localStorage.removeItem('tabify_last_screen');
   teardownRealtime();
   ME = null; allDebts=[]; allTx=[]; pendingTx=[];
-
   gotoScreen('auth');
-
   document.getElementById('id-input').value='';
   populateRecentLogins();
   clearPin();
@@ -459,6 +482,19 @@ async function loadData() {
   } catch(e) {
     console.error(e);
   }
+}
+
+function updateOnlineCount(count) {
+    const el = document.getElementById('online-indicator');
+    const countEl = document.getElementById('online-count');
+    if (!el || !countEl) return;
+
+    if (count > 0) {
+        countEl.textContent = count;
+        el.style.display = 'flex';
+    } else {
+        el.style.display = 'none';
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -539,6 +575,7 @@ function renderHistory() {
 
 function renderTxItem(tx) {
     const sent = tx.from_id === ME.id;
+    const itemClass = sent ? 'sent' : 'recv';
     const isPay = tx.type === 'pay';
     const who = sent ? (tx.to_name || '?') : (tx.from_name || '?');
     let label;
@@ -552,7 +589,7 @@ function renderTxItem(tx) {
     const iconBg = tx.status === 'pending' ? 'tx-pend' : (sent ? 'tx-sent' : 'tx-recv');
     const icon = tx.status === 'pending' ? '⏳' : (sent ? '↑' : '↓');
     const dt = new Date(tx.created_at).toLocaleDateString();
-    return `<div class="tx-item">
+    return `<div class="tx-item ${itemClass}">
       <div class="tx-icon ${iconBg}">${icon}</div>
       <div>
         <div class="tx-who">${esc(label)}</div>
@@ -607,9 +644,8 @@ function renderProfileScreen() {
   
   // Part 1: Profile Info Display
   document.getElementById('profile-photo-display').innerHTML = avatarHTML(ME.full_name || ME.username, ME.photo_url, 96);
-  document.getElementById('profile-fullname-display').value = ME.full_name || '';
-  document.getElementById('profile-username-display').value = ME.username;
-  document.getElementById('profile-phone-display').value = ME.phone;
+  document.getElementById('profile-fullname-display').textContent = ME.full_name || ME.username;
+  document.getElementById('profile-username-display').textContent = '@' + ME.username;
 
   // Part 2: Profile Edit Form
   document.getElementById('profile-username-input').value = ME.username;
@@ -769,28 +805,22 @@ function drawQR(containerId, value, size) {
         return;
     }
 
-    if (typeof QRCode === 'undefined') {
-        console.error('QRCode library is not loaded.');
-        container.innerHTML = '<div style="font-size:12px; color:#ff8080; text-align:center; padding: 20px 10px;">Error: QR library failed to load. Check internet connection.</div>';
-        return;
-    }
-
-    QRCode.toString(value, {
-        type: 'svg',
-        width: size,
-        margin: 1,
-        color: {
-            dark: '#00e5a0', // QR code dots
-            light: '#0000'   // Transparent background
-        }
-    }, function (error, svgString) {
-        if (error) {
-            console.error('QR SVG Error:', error);
-            container.innerHTML = '<div style="font-size:12px; color:#ff8080; text-align:center; padding: 20px 10px;">Could not generate QR code.</div>';
-        } else {
-            container.innerHTML = svgString;
-        }
-    });
+    // Using a reliable external API to generate the QR code as a PNG image.
+    // This can improve scannability and offloads generation from the client.
+    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(value)}&size=${size}x${size}&color=00e5a0&bgcolor=0d1117&qzone=1`;
+    
+    const img = document.createElement('img');
+    img.src = qrApiUrl;
+    img.width = size;
+    img.height = size;
+    img.alt = `QR Code for ${value}`;
+    img.style.display = 'block'; // Ensure it behaves as a block element
+    img.onerror = () => {
+        console.error('QR API Error: Failed to load QR code image.');
+        container.innerHTML = '<div style="font-size:12px; color:#ff8080; text-align:center; padding: 20px 10px;">Could not generate QR code. Check internet connection.</div>';
+    };
+    
+    container.appendChild(img);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -895,6 +925,13 @@ function scanQR() {
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const code = jsQR(imageData.data, imageData.width, imageData.height);
     if (code) {
+      // Visual feedback on successful scan
+      const camFrame = document.querySelector('.cam-frame');
+      if (camFrame) {
+        camFrame.classList.add('detected');
+        setTimeout(() => camFrame.classList.remove('detected'), 400);
+      }
+
       if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
       resolvePayUsername(code.data.trim());
       return;
@@ -925,6 +962,7 @@ async function startCamera() {
 async function lookupPayUsername() {
   const username = document.getElementById('type-token-input').value.trim();
   if (!username) return;
+  document.getElementById('pay-results').innerHTML = ''; // Clear suggestions
   await resolvePayUsername(username);
 }
 
@@ -1000,6 +1038,34 @@ async function submitPay() {
     toast(`Payment request sent to ${foundPayProfile.username} ✅`);
   } catch(e) { toast(e.message||'Failed','e'); }
   finally { btn.disabled=false; btn.textContent=`Send to ${foundPayProfile?.username||''}`; }
+}
+
+async function searchPayUsers(q) {
+  clearTimeout(searchTimer);
+  const res = document.getElementById('pay-results');
+  if (!q || q.length < 2) { res.innerHTML = ''; return; }
+  searchTimer = setTimeout(async () => {
+    try {
+      const byPhone = await sb(`profiles?phone=ilike.*${encodeURIComponent(q)}*&limit=3`).catch(() => []);
+      const byUser = await sb(`profiles?username=ilike.*${encodeURIComponent(q)}*&limit=3`).catch(() => []);
+      const merged = [...(byPhone || []), ...(byUser || [])];
+      const unique = merged.filter((p, i, a) => p.id !== ME.id && a.findIndex(x => x.id === p.id) === i).slice(0, 4);
+      if (!unique.length) { res.innerHTML = '<div style="color:#7d8590;font-size:14px;padding:8px 0">No users found</div>'; return; }
+      res.innerHTML = unique.map(p => `
+        <div class="search-result" onclick="selectPayUser('${esc(p.username)}')">
+          ${avatarHTML(p.full_name || p.username, p.photo_url || null, 40)}
+          <div>
+            <div style="font-weight:600;font-size:15px">${esc(p.username)}</div>
+            <div style="font-size:12px;color:#7d8590">${esc(p.phone || '')}</div>
+          </div>
+        </div>`).join('');
+    } catch { }
+  }, 350);
+}
+
+function selectPayUser(username) {
+  document.getElementById('type-token-input').value = username;
+  lookupPayUsername();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1088,36 +1154,50 @@ function setupRealtime() {
 
   channel
     // 1. Listen for new incoming transactions for toast/pop-up notifications
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transactions', filter: `to_id=eq.${ME.id}` }, payload => {
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transactions', filter: `to_id=eq.${ME.id}` }, (payload) => {
         console.log('Realtime: new incoming transaction', payload.new);
         const type = payload.new.type === 'pay' ? 'payment' : 'debt record';
+        playNotificationSound();
         toast(`New ${type} from ${payload.new.from_name}!`, 'i');
         loadData(); // Reload data to get the new transaction
     })
     // 2. Listen for updates to transactions you sent (e.g., accepted/declined)
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'transactions', filter: `from_id=eq.${ME.id}` }, payload => {
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'transactions', filter: `from_id=eq.${ME.id}` }, (payload) => {
         if (payload.old.status === 'pending' && payload.new.status !== 'pending') {
             const toName = payload.new.to_name || 'Someone';
             toast(`${toName} ${payload.new.status} your request.`, 'i');
         }
     })
     // 3. Listen for ANY change to the debts ledger to keep balances live
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'debts', filter: `or=(user_a.eq.${ME.id},user_b.eq.${ME.id})` }, payload => {
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'debts', filter: `or=(user_a.eq.${ME.id},user_b.eq.${ME.id})` }, () => {
         console.log('Realtime: debt ledger changed, reloading data.');
         loadData();
     })
     .subscribe();
 
   realtimeChannel = channel;
+
+  presenceChannel = sbClient.channel('wll-online-users', { config: { presence: { key: ME.username } } });
+  presenceChannel
+    .on('presence', { event: 'sync' }, () => {
+      const count = Object.keys(presenceChannel.presenceState()).length;
+      updateOnlineCount(count);
+    })
+    .subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await presenceChannel.track({ online_at: new Date().toISOString() });
+      }
+    });
 }
 
 function teardownRealtime() {
-    if (realtimeChannel) {
-        console.log('Tearing down realtime subscriptions...');
-        sbClient.removeChannel(realtimeChannel);
-        realtimeChannel = null;
-        sbClient = null;
-    }
+  if (sbClient) {
+    console.log('Tearing down realtime subscriptions...');
+    sbClient.removeAllChannels();
+    realtimeChannel = null;
+    presenceChannel = null;
+    sbClient = null;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1151,6 +1231,11 @@ function gotoScreen(id) {
   // Show navbar only for nav screens
   document.getElementById('navbar').style.display = navScreens.includes(id) ? 'flex' : 'none';
 
+  // Remember the last visited main screen
+  if (navScreens.includes(id)) {
+    localStorage.setItem('tabify_last_screen', id);
+  }
+
   // Handle nav bar items
   document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
   const nb=document.getElementById('nav-'+id);
@@ -1181,7 +1266,8 @@ buildNumpad();
       document.getElementById('splash').style.display='none';
       showAuth(false);
       setLanguage(currentLang);
-      gotoScreen('home');
+      const lastScreen = localStorage.getItem('tabify_last_screen');
+      gotoScreen(navScreens.includes(lastScreen) ? lastScreen : 'home');
       setupRealtime();
       return;
     } catch {}

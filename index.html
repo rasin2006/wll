@@ -130,13 +130,15 @@
     </div>
 
     <div class="field" id="signup-fullname" style="display:none">
-      <label>Full Name</label>
+      <label data-i18n="full_name">Full Name</label>
       <input type="text" id="fullname-input" placeholder="e.g. Alex King" autocomplete="off">
+      <div style="font-size:11px; color:#7d8590; margin-top:4px;" data-i18n="full_name_hint"></div>
     </div>
 
     <div class="field" id="signup-username" style="display:none">
       <label data-i18n="username">Username</label>
       <input type="text" id="username-input" placeholder="e.g. alex_king" autocomplete="off">
+      <div style="font-size:11px; color:#7d8590; margin-top:4px;" data-i18n="username_hint"></div>
     </div>
 
     <div class="field">
@@ -177,6 +179,10 @@
             🔔<div class="badge" id="notif-badge" style="display:none">0</div>
           </button>
           <button class="icon-btn" onclick="openQR()" title="My QR">▣</button>
+          <div id="online-indicator" style="display: none; align-items: center; gap: 6px; font-size: 13px; color: #7d8590; margin: 0 8px;">
+            <div style="width: 8px; height: 8px; border-radius: 50%; background: #00e5a0; animation: pulse 1s infinite alternate;"></div>
+            <div><span id="online-count">0</span> online</div>
+          </div>
           <div class="lang-switcher">
             <button class="lang-btn lang-btn-en active" onclick="setLanguage('en')">EN</button>
             <button class="lang-btn lang-btn-km" onclick="setLanguage('km')">ខ្មែរ</button>
@@ -226,14 +232,15 @@
 
     <!-- Display/Edit Wrapper -->
     <div id="profile-display-wrap">
-        <div class="photo-upload" style="margin-bottom: 24px;">
+        <div class="photo-upload" style="margin-bottom: 16px;">
             <div class="photo-circle" id="profile-photo-display" style="width:96px; height:96px; border-style: solid; border-color: #00e5a033;">
                 <!-- avatarHTML will populate this -->
             </div>
         </div>
-        <div class="field"><label>Full Name</label><input type="text" id="profile-fullname-display" readonly style="background:#0d1117; opacity: 0.8;"></div>
-        <div class="field"><label data-i18n="username">Username</label><input type="text" id="profile-username-display" readonly style="background:#0d1117; opacity: 0.8;"></div>
-        <div class="field"><label data-i18n="phone">Phone</label><input type="text" id="profile-phone-display" readonly style="background:#0d1117; opacity: 0.8;"></div>
+        <div style="text-align: center; margin-bottom: 24px;">
+            <div id="profile-fullname-display" style="font-size: 22px; font-weight: 700;"></div>
+            <div id="profile-username-display" style="font-size: 16px; color: #7d8590; margin-top: 4px;"></div>
+        </div>
         <button class="btn-primary" id="edit-profile-btn" onclick="toggleProfileEdit(true)" data-i18n="edit_profile">Edit Profile</button>
       </div>
 
@@ -247,7 +254,7 @@
             </div>
             <input type="file" id="profile-photo-file" accept="image/*" style="display:none">
         </div>
-        <div class="field"><label>Full Name</label><input type="text" id="profile-fullname-input"></div>
+        <div class="field"><label data-i18n="full_name">Full Name</label><input type="text" id="profile-fullname-input"></div>
         <div class="field"><label data-i18n="username">Username</label><input type="text" id="profile-username-input"></div>
         <div class="field"><label data-i18n="phone">Phone</label><input type="text" id="profile-phone-input" disabled><div style="font-size:11px; color:#7d8590; margin-top:4px;" data-i18n="phone_number_disabled">Phone number cannot be changed.</div></div> 
         <button class="btn-primary" onclick="saveProfileChanges()" data-i18n="save_changes">Save Changes</button>
@@ -330,33 +337,25 @@
   <div class="sheet" onclick="event.stopPropagation()" style="max-height:90vh;overflow-y:auto">
     <div class="sheet-handle"></div>
     <div class="sheet-title" data-i18n="pay">Pay someone</div>
-    <div class="sheet-sub" data-i18n="pay_sub">Scan, type, or upload their QR code</div>
-
-    <div class="tab-row">
-      <button class="tab-btn active" id="tab-scan" onclick="setPayTab('scan')">📷 Scan</button>
-      <button class="tab-btn" id="tab-type" onclick="setPayTab('type')">⌨ Type</button>
-      <button class="tab-btn" id="tab-upload" onclick="setPayTab('upload')">🖼 Upload</button>
-    </div>
 
     <!-- Scan -->
     <div id="pay-scan">
       <div class="cam-view" id="cam-view">
         <video id="cam-video" autoplay playsinline muted></video>
-        <div class="cam-overlay"><div class="cam-frame"></div></div>
+        <div class="cam-overlay"><div class="cam-frame"><div class="cam-scanline"></div></div></div>
       </div>
       <button class="btn-primary" id="cam-start-btn" onclick="startCamera()">Open camera</button>
-      <div style="font-size:12px;color:#7d8590;text-align:center;margin-top:8px">Point at someone's QR code</div>
     </div>
 
     <!-- Type -->
     <div id="pay-type" style="display:none">
       <div class="field"><label>Recipient's Username</label>
         <div class="token-input-row">
-          <input class="token-input" id="type-token-input" placeholder="e.g. alex_king"
-            onkeydown="if(event.key==='Enter')lookupPayUsername()">
+          <input class="token-input" id="type-token-input" placeholder="e.g. alex_king" onkeydown="if(event.key==='Enter')lookupPayUsername()" oninput="searchPayUsers(this.value)">
           <button class="find-btn" onclick="lookupPayUsername()">Find</button>
         </div>
       </div>
+      <div id="pay-results" style="margin-top: 10px;"></div>
     </div>
 
     <!-- Upload -->
@@ -366,6 +365,13 @@
         Tap to upload a QR image
       </div>
       <input type="file" id="qr-file" accept="image/*" style="display:none" onchange="handleQRUpload(event)">
+    </div>
+
+    <div class="sheet-sub" data-i18n="pay_sub" style="text-align:center; margin-top:16px;">Scan, type, or upload their QR code</div>
+    <div class="tab-row" style="margin-top: 8px;">
+      <button class="tab-btn active" id="tab-scan" onclick="setPayTab('scan')">📷 Scan</button>
+      <button class="tab-btn" id="tab-type" onclick="setPayTab('type')">⌨ Type</button>
+      <button class="tab-btn" id="tab-upload" onclick="setPayTab('upload')">🖼 Upload</button>
     </div>
 
     <!-- Found user -->
@@ -407,7 +413,6 @@
   </div>
 </div>
 
-<script defer src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </div><!-- #app -->
