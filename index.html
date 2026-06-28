@@ -264,7 +264,8 @@
     <div class="divider" style="margin: 28px 0;"></div>
 
     <!-- QR Code Section -->
-    <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;margin-bottom:6px;" data-i18n="your_payment_code">Your Payment Code</div>
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;margin-bottom:6px;" data-i18n="your_payment_code">Your payment code</div>
+    <div id="profile-qr-Code<edivr
     <div style="color:#7d8590;font-size:14px;margin-bottom:20px;" data-i18n="share_qr_sub">Share this so others can pay you.</div>
       <div class="qr-card" style="width:100%">
         <div id="profile-qr-avatar"></div>
@@ -304,6 +305,7 @@
   <div class="sheet" onclick="event.stopPropagation()" style="max-height:85vh;overflow-y:auto">
     <div class="sheet-handle"></div>
     <div id="peer-history-header" style="padding: 0 4px;"></div>
+    <div id="peer-history-actions" class="action-row" style="margin-top: 20px; padding: 0 4px;"></div>
     <div id="peer-history-list" style="margin-top:12px"></div>
   </div>
 </div>
@@ -392,8 +394,8 @@
 <div class="overlay" id="req-overlay" onclick="closeOverlay('req-overlay')">
   <div class="sheet" onclick="event.stopPropagation()" style="max-height:90vh;overflow-y:auto">
     <div class="sheet-handle"></div>
-    <div class="sheet-title">Record a Debt</div>
-    <div class="sheet-sub">Find the person you owe money to</div>
+    <div class="sheet-title" data-i18n="borrow">Borrow money</div>
+    <div class="sheet-sub" data-i18n="find_person_borrow">Find the person you need to borrow money from</div>
 
     <div id="req-search-step">
       <input class="search-input" type="text" id="req-search" placeholder="Username or phone..." oninput="searchUsers(this.value)">
@@ -404,7 +406,7 @@
       <div class="found-card" id="req-found-card"></div>
       <div class="field"><label>Amount (រៀល)</label>
         <input class="amount-input" type="number" id="req-amount" placeholder="0">
-        <div class="amount-hint">Enter amount in Khmer Riel</div>
+        <div class="amount-hint" data-i18n="enter_amount_khmer">Enter amount in Khmer Riel</div>
       </div>
       <input class="note-input" type="text" id="req-note" placeholder="What's this for?">
       <button class="btn-primary" onclick="submitRequest()">Record Debt</button>

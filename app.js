@@ -184,6 +184,9 @@ const i18n = {
     you_owe_meta: 'អ្នកជំពាក់',
     owes_you: 'ជំពាក់អ្នក',
     paid_you: 'បានសងអ្នក',
+    find_person_borrow: 'ស្វែងរកមនុស្សដែលអ្នកចង់ខ្ចីប្រាក់ពីពួកគេ',
+    find_person_pay: 'ស្វែងរកមនុស្សដែលអ្្នកចង់បង់ប្រាក់ឱ្យពួកគេ',
+    enter_amount_khmer: 'បញ្ចូលចំនុំទឹកប្រាក់ជារៀល'
   }
 };
 
@@ -655,7 +658,48 @@ function openPeerHistory(otherUserId) {
     listEl.innerHTML = peerTx.map(tx => renderTxItem(tx)).join('');
   }
 
+  const actionsEl = document.getElementById('peer-history-actions');
+  if (actionsEl) {
+      actionsEl.innerHTML = `
+        <button class="action-btn pay-btn-main" onclick="payUserFromHistory('${esc(otherUser.username)}')">
+          <span class="ab-icon">↑</span> 
+          <span class="ab-label" data-i18n="pay">Pay</span>
+        </button>
+        <button class="action-btn req-btn-main" onclick="borrowFromUserInHistory('${otherUser.id}','${esc(otherUser.username)}','${esc(otherUser.full_name || otherUser.username)}','${esc(otherUser.phone||'')}','${esc(otherUser.photo_url||'')}')">
+          <span class="ab-icon">💸</span> 
+          <span class="ab-label" data-i18n="borrow">Borrow</span>
+        </button>
+      `;
+  }
+
   openOverlay('peer-history-overlay');
+  applyTranslations();
+}
+
+function payUserFromHistory(username) {
+  closeOverlay('peer-history-overlay');
+  setTimeout(() => {
+    // Manually open the pay overlay and bypass the tab selection UI
+    openOverlay('pay-overlay');
+
+    // Hide the tab UI elements
+    document.querySelector('#pay-overlay .tab-row').style.display = 'none';
+    document.querySelector('#pay-overlay .sheet-sub').style.display = 'none';
+    ['scan', 'type', 'upload'].forEach(t => {
+      document.getElementById('pay-' + t).style.display = 'none';
+    });
+
+    // Directly resolve the username to show the amount input
+    resolvePayUsername(username);
+  }, 250);
+}
+
+function borrowFromUserInHistory(id, username, fullname, phone, photo) {
+    closeOverlay('peer-history-overlay');
+    setTimeout(() => {
+        openRequest();
+        selectReqUser(id, username, fullname, phone, photo);
+    }, 250);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1063,6 +1107,11 @@ function resetPayFound() {
   document.getElementById('pay-found').style.display = 'none';
   document.getElementById('pay-amount').value = '';
   document.getElementById('pay-note').value = '';
+
+  // Restore visibility of tab UI for the normal flow
+  document.querySelector('#pay-overlay .tab-row').style.display = 'flex';
+  document.querySelector('#pay-overlay .sheet-sub').style.display = 'block';
+
   setPayTab('scan');
   if (camStream) { camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
 }
