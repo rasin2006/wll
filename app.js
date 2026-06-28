@@ -1166,6 +1166,8 @@ function setupRealtime() {
         if (payload.old.status === 'pending' && payload.new.status !== 'pending') {
             const toName = payload.new.to_name || 'Someone';
             toast(`${toName} ${payload.new.status} your request.`, 'i');
+            // This is the "trick": reload all data to reflect the change instantly.
+            loadData();
         }
     })
     // 3. Listen for ANY change to the debts ledger to keep balances live
