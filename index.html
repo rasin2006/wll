@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>WLL</title>
+<link rel="icon" href="logo/submark_icon_wll.png" type="image/png">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Khmer:wght@100..900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<style>
+  /* Language switcher styles for Auth screen */
+  .lang-switcher-container {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    z-index: 10;
+  }
+  .lang-switcher {
+    display: flex;
+    gap: 4px;
+    background: #161b22;
+    border: 1.5px solid #21262d;
+    border-radius: 10px;
+    padding: 4px;
+  }
+  .lang-btn {
+    padding: 4px 10px;
+    border-radius: 10px;
+    border: none;
+    background: transparent;
+    color: #7d8590;
+    font-weight: 600;
+    font-size: 13px;
+    transition: all .15s;
+  }
+  .lang-btn.active {
+    background: #00e5a0;
+    color: #0d1117;
+  }
+</style>
+<style>
+  /* Center the pop-up modals instead of having them slide from the bottom */
+  .overlay {
+    display: none; /* Hidden by default */
+    position: fixed;
+    inset: 0; /* A shorthand for top, right, bottom, left */
+    background: rgba(13, 17, 23, 0.7); /* Dark, semi-transparent backdrop */
+    z-index: 1000;
+    
+    /* Centering properties */
+    justify-content: center;
+    align-items: center;
+
+    /* Animation for fading in */
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+  }
+
+  .overlay.open {
+    display: flex; /* Change display to flex to show and center content */
+    opacity: 1;
+  }
+
+  .sheet {
+    /* These styles override the original "bottom sheet" look */
+    background: #161b22; /* A dark background matching the app theme */
+    border-radius: 16px; /* Fully rounded corners for a modal look */
+    width: 90%; /* Make it responsive */
+    max-width: 420px; /* But not too wide on large screens */
+    border: 1px solid #30363d;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    position: relative; /* Crucial to override absolute positioning from the bottom */
+    
+    /* Animation for the modal appearing (scaling up and fading in) */
+    transform: scale(0.95);
+    opacity: 0;
+    transition: transform 0.2s ease-in-out, opacity 0.2s ease-in-out;
+  }
+
+  .overlay.open .sheet {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  /* The handle is a visual cue for a draggable bottom sheet, so we hide it. */
+  .sheet-handle {
+    display: none;
+  }
+</style>
+<body>
+<div id="app">
+  <div id="toast"></div>
+
+  <!-- SPLASH -->
+  <div id="splash">
+    <div class="splash-logo">
+      <img src="logo/submark_icon_wll.png" alt="WLL Logo" style="width: 100%; height: 100%; object-fit: cover;">
+    </div>
+    <div class="splash-title">WLL</div>
+    <div class="splash-sub">W Local Loan</div>
+    <div class="splash-dot"></div>
+  </div>
+
+  <!-- AUTH -->
+  <div id="auth" class="screen">
+    <!-- Language Switcher -->
+    <div class="lang-switcher-container">
+        <div class="lang-switcher">
+            <button class="lang-btn lang-btn-en active" onclick="setLanguage('en')">EN</button>
+            <button class="lang-btn lang-btn-km" onclick="setLanguage('km')">ខ្មែរ</button>
+        </div>
+    </div>
+    <div class="auth-title" id="auth-title" data-i18n="welcome_back">Welcome back</div>
+    <div class="auth-sub" id="auth-sub" data-i18n="auth_sub_signin">Sign in with your phone or username</div>
+
+    <div class="photo-upload" id="signup-photo" style="display:none">
+      <div class="photo-circle" onclick="document.getElementById('photo-file').click()">
+        <img id="photo-preview" src="" style="display:none" alt="">
+        <div id="photo-ph" style="display:flex;flex-direction:column;align-items:center;gap:3px">
+          <span style="font-size:26px">📷</span>
+          <span style="font-size:11px;color:#7d8590">Photo</span>
+        </div>
+      </div>
+      <div class="photo-label">Optional profile photo</div>
+      <input type="file" id="photo-file" accept="image/*" style="display:none">
+    </div>
+
+    <div class="field" id="signup-fullname" style="display:none">
+      <label>Full Name</label>
+      <input type="text" id="fullname-input" placeholder="e.g. Alex King" autocomplete="off">
+    </div>
+
+    <div class="field" id="signup-username" style="display:none">
+      <label data-i18n="username">Username</label>
+      <input type="text" id="username-input" placeholder="e.g. alex_king" autocomplete="off">
+    </div>
+
+    <div class="field">
+      <label id="id-label" data-i18n="phone_or_username">Phone or username</label>
+      <input type="text" id="id-input" placeholder="Phone number or username" autocomplete="off" data-i18n-placeholder="phone_or_username_ph" list="recent-logins">
+      <datalist id="recent-logins"></datalist>
+    </div>
+
+    <div class="pin-section">
+      <div class="pin-label" id="pin-label" data-i18n="pin_enter">Enter your PIN</div>
+      <div class="pin-display" id="pin-display">
+        <div class="pin-dot" id="pd0">–</div>
+        <div class="pin-dot" id="pd1">–</div>
+        <div class="pin-dot" id="pd2">–</div>
+        <div class="pin-dot" id="pd3">–</div>
+      </div>
+      <div class="numpad" id="numpad"></div>
+    </div>
+
+    <button class="btn-primary" id="auth-btn" onclick="doAuth()" data-i18n="btn_create_account" style="display: none;">Create account</button>
+
+    <div class="auth-switch" id="auth-switch">New here? <span onclick="toggleMode()">Create account</span></div>
+  </div>
+
+  <!-- HOME -->
+  <div id="home" class="screen pb-nav">
+    <div class="home-header">
+      <div class="home-top">
+        <div class="home-avatar" onclick="openQR()">
+          <div id="home-avatar-el"></div>
+        </div>
+        <div class="home-name">
+          <div class="home-greeting" data-i18n="good_day">Good day,</div>
+          <div class="home-username" id="home-username">—</div>
+        </div>
+        <div class="home-actions">
+          <button class="icon-btn" onclick="openNotif()" id="notif-btn" title="Notifications">
+            🔔<div class="badge" id="notif-badge" style="display:none">0</div>
+          </button>
+          <button class="icon-btn" onclick="openQR()" title="My QR">▣</button>
+          <div class="lang-switcher">
+            <button class="lang-btn lang-btn-en active" onclick="setLanguage('en')">EN</button>
+            <button class="lang-btn lang-btn-km" onclick="setLanguage('km')">ខ្មែរ</button>
+          </div>
+        </div>
+      </div>
+      <div class="balance-card">
+        <div class="balance-label" data-i18n="net_position">Net position</div>
+        <div class="balance-amount" id="net-balance">0 រៀល</div>
+        <div class="balance-row">
+          <div class="balance-cell">
+            <div class="balance-cell-label" data-i18n="owed_to_you">Owed to you</div>
+            <div class="balance-cell-val green" id="total-owed">0 រៀល</div>
+          </div>
+          <div class="balance-cell">
+            <div class="balance-cell-label" data-i18n="you_owe">You owe</div>
+            <div class="balance-cell-val red" id="total-iowe">0 រៀល</div>
+          </div>
+        </div>
+      </div>
+      <div class="action-row">
+        <button class="action-btn pay-btn-main" onclick="openPay()">
+          <span class="ab-icon">↑</span> 
+          <span class="ab-label" data-i18n="pay">Pay</span>
+        </button>
+        <button class="action-btn req-btn-main" onclick="openRequest()">
+          <span class="ab-icon">💸</span> 
+          <span class="ab-label" data-i18n="borrow">Borrow</span>
+        </button>
+      </div>
+    </div>
+    <div class="section-wrap">
+      <div id="debt-list-wrap"></div>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div id="history" class="screen">
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;margin-bottom:20px" data-i18n="history">History</div>
+    <div id="tx-list"></div>
+  </div>
+
+<!-- PROFILE/MANAGEMENT SCREEN -->
+<div id="profile-screen" class="screen pb-nav">
+  <div style="padding: 52px 20px 20px;">
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;margin-bottom:20px;" data-i18n="manage_profile">Manage Profile</div>
+
+    <!-- Display/Edit Wrapper -->
+    <div id="profile-display-wrap">
+        <div class="photo-upload" style="margin-bottom: 24px;">
+            <div class="photo-circle" id="profile-photo-display" style="width:96px; height:96px; border-style: solid; border-color: #00e5a033;">
+                <!-- avatarHTML will populate this -->
+            </div>
+        </div>
+        <div class="field"><label>Full Name</label><input type="text" id="profile-fullname-display" readonly style="background:#0d1117; opacity: 0.8;"></div>
+        <div class="field"><label data-i18n="username">Username</label><input type="text" id="profile-username-display" readonly style="background:#0d1117; opacity: 0.8;"></div>
+        <div class="field"><label data-i18n="phone">Phone</label><input type="text" id="profile-phone-display" readonly style="background:#0d1117; opacity: 0.8;"></div>
+        <button class="btn-primary" id="edit-profile-btn" onclick="toggleProfileEdit(true)" data-i18n="edit_profile">Edit Profile</button>
+      </div>
+
+    <div id="profile-edit-form" style="display:none;">
+        <div class="photo-upload" style="margin-bottom: 24px;">
+            <div class="photo-circle" onclick="document.getElementById('profile-photo-file').click()" style="width:96px; height:96px;">
+                <img id="profile-photo-preview" src="" style="display:none; width:96px; height:96px;" alt="">
+                <div id="profile-photo-ph" style="display:flex;flex-direction:column;align-items:center;gap:3px">
+                    <span style="font-size:32px">📷</span><span style="font-size:12px;color:#7d8590">Change</span>
+                </div>
+            </div>
+            <input type="file" id="profile-photo-file" accept="image/*" style="display:none">
+        </div>
+        <div class="field"><label>Full Name</label><input type="text" id="profile-fullname-input"></div>
+        <div class="field"><label data-i18n="username">Username</label><input type="text" id="profile-username-input"></div>
+        <div class="field"><label data-i18n="phone">Phone</label><input type="text" id="profile-phone-input" disabled><div style="font-size:11px; color:#7d8590; margin-top:4px;" data-i18n="phone_number_disabled">Phone number cannot be changed.</div></div> 
+        <button class="btn-primary" onclick="saveProfileChanges()" data-i18n="save_changes">Save Changes</button>
+        <button class="btn-ghost" onclick="toggleProfileEdit(false)" style="margin-top:10px" data-i18n="cancel">Cancel</button>
+      </div>
+
+    <div class="divider" style="margin: 28px 0;"></div>
+
+    <!-- QR Code Section -->
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;margin-bottom:6px;" data-i18n="your_payment_code">Your Payment Code</div>
+    <div style="color:#7d8590;font-size:14px;margin-bottom:20px;" data-i18n="share_qr_sub">Share this so others can pay you.</div>
+      <div class="qr-card" style="width:100%">
+        <div id="profile-qr-avatar"></div>
+        <div id="qr-canvas-profile"></div>
+        <div style="background:#161b22;border-radius:12px;padding:12px 24px;text-align:center; width:100%;">
+          <div style="font-size:11px;color:#7d8590;margin-bottom:4px" data-i18n="username">Your Username</div>
+          <div class="qr-token" id="profile-qr-token-val"></div>
+        </div>
+      </div>
+    <div class="divider" style="margin: 28px 0;"></div>
+    <button class="btn-ghost" onclick="logout()" data-i18n="sign_out" style="width: 100%;">Sign Out</button>
+  </div>
+  </div>
+
+  <!-- ADMIN SCREEN -->
+  <div id="admin-screen" class="screen">
+    <!-- Content will be rendered by renderAdminScreen() -->
+  </div>
+
+  <!-- NAVBAR -->
+  <div id="navbar" style="display:none">
+    <button class="nav-item active" id="nav-home" onclick="gotoScreen('home')">
+      <div class="nav-icon">⌂</div><div class="nav-label" data-i18n="nav_home">Home</div>
+    </button>
+    <button class="nav-item" id="nav-history" onclick="gotoScreen('history')">
+      <div class="nav-icon">↯</div><div class="nav-label" data-i18n="nav_history">History</div>
+    </button>
+    <button class="nav-item" id="nav-profile-screen" onclick="gotoScreen('profile-screen')">
+      <div class="nav-icon">👤</div><div class="nav-label" data-i18n="nav_profile">Profile</div>
+    </button>
+  </div>
+
+<!-- ══ OVERLAYS ══════════════════════════════════════════════════════════════ -->
+
+<!-- Peer History overlay -->
+<div class="overlay" id="peer-history-overlay" onclick="closeOverlay('peer-history-overlay')">
+  <div class="sheet" onclick="event.stopPropagation()" style="max-height:85vh;overflow-y:auto">
+    <div class="sheet-handle"></div>
+    <div id="peer-history-header" style="padding: 0 4px;"></div>
+    <div id="peer-history-list" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<!-- QR overlay (from header) -->
+<div class="overlay" id="qr-overlay" onclick="closeOverlay('qr-overlay')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" data-i18n="your_payment_code">Your payment code</div>
+    <div class="sheet-sub" data-i18n="others_can_scan_this_to_pay_you">Others can scan this to pay you.</div>
+    <div class="qr-card">
+      <div id="qr-canvas-ov"></div>
+      <div style="text-align:center">
+        <div class="qr-token" id="qr-token-val"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Notifications overlay -->
+<div class="overlay" id="notif-overlay" onclick="closeOverlay('notif-overlay')">
+  <div class="sheet" onclick="event.stopPropagation()" style="max-height:75vh;overflow-y:auto">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title " data-i18n="notifications">Notifications</div>
+    <div id="notif-list" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<!-- Pay overlay -->
+<div class="overlay" id="pay-overlay" onclick="closeOverlay('pay-overlay')">
+  <div class="sheet" onclick="event.stopPropagation()" style="max-height:90vh;overflow-y:auto">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" data-i18n="pay">Pay someone</div>
+    <div class="sheet-sub" data-i18n="pay_sub">Scan, type, or upload their QR code</div>
+
+    <div class="tab-row">
+      <button class="tab-btn active" id="tab-scan" onclick="setPayTab('scan')">📷 Scan</button>
+      <button class="tab-btn" id="tab-type" onclick="setPayTab('type')">⌨ Type</button>
+      <button class="tab-btn" id="tab-upload" onclick="setPayTab('upload')">🖼 Upload</button>
+    </div>
+
+    <!-- Scan -->
+    <div id="pay-scan">
+      <div class="cam-view" id="cam-view">
+        <video id="cam-video" autoplay playsinline muted></video>
+        <div class="cam-overlay"><div class="cam-frame"></div></div>
+      </div>
+      <button class="btn-primary" id="cam-start-btn" onclick="startCamera()">Open camera</button>
+      <div style="font-size:12px;color:#7d8590;text-align:center;margin-top:8px">Point at someone's QR code</div>
+    </div>
+
+    <!-- Type -->
+    <div id="pay-type" style="display:none">
+      <div class="field"><label>Recipient's Username</label>
+        <div class="token-input-row">
+          <input class="token-input" id="type-token-input" placeholder="e.g. alex_king"
+            onkeydown="if(event.key==='Enter')lookupPayUsername()">
+          <button class="find-btn" onclick="lookupPayUsername()">Find</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Upload -->
+    <div id="pay-upload" style="display:none">
+      <div class="upload-zone" onclick="document.getElementById('qr-file').click()">
+        <div style="font-size:32px;margin-bottom:8px">🖼</div>
+        Tap to upload a QR image
+      </div>
+      <input type="file" id="qr-file" accept="image/*" style="display:none" onchange="handleQRUpload(event)">
+    </div>
+
+    <!-- Found user -->
+    <div id="pay-found" style="display:none">
+      <div class="found-card" id="pay-found-card"></div>
+      <div class="field"><label>Amount (រៀល)</label>
+        <input class="amount-input" type="number" id="pay-amount" placeholder="0">
+        <div class="amount-hint">Enter amount in Khmer Riel</div>
+      </div>
+      <input class="note-input" type="text" id="pay-note" placeholder="Note (optional)">
+      <button class="btn-primary" id="pay-confirm-btn" onclick="submitPay()">Send payment request</button>
+      <div class="back-link" onclick="resetPayFound()">← Back</div>
+    </div>
+  </div>
+</div>
+
+<!-- Request overlay -->
+<div class="overlay" id="req-overlay" onclick="closeOverlay('req-overlay')">
+  <div class="sheet" onclick="event.stopPropagation()" style="max-height:90vh;overflow-y:auto">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Record a Debt</div>
+    <div class="sheet-sub">Find the person you owe money to</div>
+
+    <div id="req-search-step">
+      <input class="search-input" type="text" id="req-search" placeholder="Username or phone..." oninput="searchUsers(this.value)">
+      <div id="req-results"></div>
+    </div>
+
+    <div id="req-amount-step" style="display:none">
+      <div class="found-card" id="req-found-card"></div>
+      <div class="field"><label>Amount (រៀល)</label>
+        <input class="amount-input" type="number" id="req-amount" placeholder="0">
+        <div class="amount-hint">Enter amount in Khmer Riel</div>
+      </div>
+      <input class="note-input" type="text" id="req-note" placeholder="What's this for?">
+      <button class="btn-primary" onclick="submitRequest()">Record Debt</button>
+      <div class="back-link" onclick="resetReqStep()">← Search again</div>
+    </div>
+  </div>
+</div>
+
+<script defer src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</div><!-- #app -->
+  <script defer src="app.js"></script>
+</body>
+</html>
