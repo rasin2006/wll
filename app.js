@@ -481,7 +481,29 @@ async function loadData() {
     updateNotifBadge();
   } catch(e) {
     console.error(e);
+    throw e; // Re-throw for callers to handle
   }
+}
+
+async function loadDataWithFeedback() {
+    const netEl = document.getElementById('net-balance');
+    if (netEl.classList.contains('refreshing')) return; // Already refreshing
+
+    netEl.classList.add('refreshing');
+    const originalText = netEl.textContent;
+    netEl.textContent = 'Refreshing...';
+    netEl.style.opacity = '0.7';
+
+    try {
+        await loadData();
+        toast('Refreshed!', 's');
+    } catch (e) {
+        toast('Refresh failed.', 'e');
+        netEl.textContent = originalText; // Restore original text on failure
+    } finally {
+        netEl.classList.remove('refreshing');
+        netEl.style.opacity = '1';
+    }
 }
 
 function updateOnlineCount(count) {
@@ -832,33 +854,42 @@ function updateNotifBadge() {
   else badge.style.display='none';
 }
 
-function openNotif() {
-  const list = document.getElementById('notif-list');
-  if (!pendingTx.length) {
-    list.innerHTML='<div class="empty-state" style="padding:24px 0"><div class="empty-icon">✅</div><div class="empty-sub">No pending notifications</div></div>';
-  } else {
-    list.innerHTML = pendingTx.map(tx => { //
-      const isPay = tx.type==='pay';
-      const label = isPay ? 'PAYMENT' : 'DEBT';
-      const cls = isPay ? 'notif-pay' : 'notif-req';
-      const who = tx.from_name||'Someone';
-      const desc = isPay ? `${who} wants to pay you` : `${who} recorded a debt to you`;
-      return `<div class="notif-item">
-        <div class="notif-top">
-          <span class="notif-type ${cls}">${label}</span>
-          <span style="font-size:13px;color:#7d8590">${new Date(tx.created_at).toLocaleDateString()}</span>
-        </div>
-        <div class="notif-who">${desc}</div>
-        <div class="notif-amount">${riel(tx.amount)}</div>
-        ${tx.note?`<div class="notif-note">"${esc(tx.note)}"</div>`:''}
-        <div class="notif-actions">
-          <button class="notif-accept" onclick="resolveTransaction('${tx.id}','accepted')">Accept</button>
-          <button class="notif-decline" onclick="resolveTransaction('${tx.id}','declined')">Decline</button>
-        </div>
-      </div>`;
-    }).join('');
+async function openNotif() {
+  const btn = document.getElementById('notif-btn');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  toast('Loading notifications...', 'i');
+
+  try {
+    await loadData(); // This refreshes pendingTx
+    const list = document.getElementById('notif-list');
+    if (!pendingTx.length) {
+      list.innerHTML = '<div class="empty-state" style="padding:24px 0"><div class="empty-icon">✅</div><div class="empty-sub">No pending notifications</div></div>';
+    } else {
+      list.innerHTML = pendingTx.map(tx => {
+        const isPay = tx.type === 'pay';
+        const label = isPay ? 'PAYMENT' : 'DEBT';
+        const cls = isPay ? 'notif-pay' : 'notif-req';
+        const who = tx.from_name || 'Someone';
+        const desc = isPay ? `${who} wants to pay you` : `${who} recorded a debt to you`;
+        return `<div class="notif-item">
+          <div class="notif-top"><span class="notif-type ${cls}">${label}</span><span style="font-size:13px;color:#7d8590">${new Date(tx.created_at).toLocaleDateString()}</span></div>
+          <div class="notif-who">${desc}</div>
+          <div class="notif-amount">${riel(tx.amount)}</div>
+          ${tx.note ? `<div class="notif-note">"${esc(tx.note)}"</div>` : ''}
+          <div class="notif-actions">
+            <button class="notif-accept" onclick="resolveTransaction('${tx.id}','accepted')">Accept</button>
+            <button class="notif-decline" onclick="resolveTransaction('${tx.id}','declined')">Decline</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+    openOverlay('notif-overlay');
+  } catch (e) {
+    toast('Could not refresh notifications.', 'e');
+  } finally {
+    btn.disabled = false;
   }
-  openOverlay('notif-overlay');
 }
 
 async function resolveTransaction(txId, status) {
@@ -895,6 +926,7 @@ async function resolveTransaction(txId, status) {
 // PAY FLOW
 // ═══════════════════════════════════════════════════════════════════════════
 function openPay() {
+  loadData();
   resetPayFound();
   openOverlay('pay-overlay');
   setPayTab('scan');
@@ -942,7 +974,19 @@ function scanQR() {
 
 async function startCamera() {
   if (camStream) return;
+  
   try {
+    // Proactively check permission status if the browser supports it.
+    // This provides a better user experience for denied permissions.
+    if (navigator.permissions && navigator.permissions.query) {
+      const permissionStatus = await navigator.permissions.query({ name: 'camera' });
+      if (permissionStatus.state === 'denied') {
+        toast('Camera access is blocked. Please allow it in your browser settings.', 'e');
+        setPayTab('type'); // Switch to a non-camera tab
+        return;
+      }
+    }
+
     camStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' }, audio:false });
     const vid = document.getElementById('cam-video');
     vid.srcObject = camStream;
@@ -950,11 +994,17 @@ async function startCamera() {
       vid.play();
       document.getElementById('cam-view').style.display = 'block';
       document.getElementById('cam-start-btn').style.display = 'none';
-      toast('Camera ready — point at QR code', 'i');
       requestAnimationFrame(scanQR);
     };
   } catch(e) {
-    toast('Camera access denied — use Type or Upload instead', 'e');
+    console.error("Camera Error:", e.name, e.message);
+    let msg = 'Could not start camera. Please use Type or Upload instead.';
+    if (e.name === 'NotAllowedError') {
+        msg = 'Camera permission denied. You can change this in your browser settings.';
+    } else if (e.name === 'NotFoundError') {
+        msg = 'No camera found on this device.';
+    }
+    toast(msg, 'e');
     setPayTab('type');
   }
 }
@@ -1071,7 +1121,11 @@ function selectPayUser(username) {
 // ═══════════════════════════════════════════════════════════════════════════
 // REQUEST FLOW (now "Owe")
 // ═══════════════════════════════════════════════════════════════════════════
-function openRequest() { resetReqStep(); openOverlay('req-overlay'); }
+function openRequest() {
+  loadData();
+  resetReqStep();
+  openOverlay('req-overlay');
+}
 
 async function searchUsers(q) {
   clearTimeout(searchTimer);
@@ -1209,8 +1263,13 @@ function openOverlay(id) { document.getElementById(id).classList.add('open'); }
 function closeOverlay(id) {
   document.getElementById(id).classList.remove('open');
   if (id==='pay-overlay' && camStream) { camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
+  // Refresh data when closing major action overlays to reflect any changes.
+  if (['pay-overlay', 'req-overlay', 'qr-overlay', 'notif-overlay'].includes(id)) {
+    loadData();
+  }
 }
 function openQR() {
+  loadData();
   openOverlay('qr-overlay');
   setTimeout(() => {
     if (!ME) return;
@@ -1243,9 +1302,10 @@ function gotoScreen(id) {
   const nb=document.getElementById('nav-'+id);
   if(nb) nb.classList.add('active');
   window.scrollTo(0,0);
-  if (id === 'home') renderHome();
-  if (id === 'history') renderHistory();
-  if (id === 'profile-screen') renderProfileScreen();
+  // Refresh data when navigating to a main screen
+  if (navScreens.includes(id)) {
+    loadData();
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
