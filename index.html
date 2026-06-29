@@ -20,6 +20,7 @@
 <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/2.4.0/uicons-regular-rounded/css/uicons-regular-rounded.css'>
 <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/2.4.0/uicons-regular-solid/css/uicons-regular-solid.css'>
 <link rel="stylesheet" href="styles.css">
+
 </head>
 <style>
   /* Language switcher styles for Auth screen */
@@ -52,57 +53,9 @@
     color: #0d1117;
   }
 </style>
-<style>
-  /* Center the pop-up modals instead of having them slide from the bottom */
-  .overlay {
-    display: none; /* Hidden by default */
-    position: fixed;
-    inset: 0; /* A shorthand for top, right, bottom, left */
-    background: rgba(13, 17, 23, 0.7); /* Dark, semi-transparent backdrop */
-    z-index: 1000;
-    
-    /* Centering properties */
-    justify-content: center;
-    align-items: center;
-
-    /* Animation for fading in */
-    opacity: 0;
-    transition: opacity 0.2s ease-in-out;
-  }
-
-  .overlay.open {
-    display: flex; /* Change display to flex to show and center content */
-    opacity: 1;
-  }
-
-  .sheet {
-    /* These styles override the original "bottom sheet" look */
-    background: #161b22; /* A dark background matching the app theme */
-    border-radius: 16px; /* Fully rounded corners for a modal look */
-    width: 90%; /* Make it responsive */
-    max-width: 420px; /* But not too wide on large screens */
-    border: 1px solid #30363d;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
-    position: relative; /* Crucial to override absolute positioning from the bottom */
-    
-    /* Animation for the modal appearing (scaling up and fading in) */
-    transform: scale(0.95);
-    opacity: 0;
-    transition: transform 0.2s ease-in-out, opacity 0.2s ease-in-out;
-  }
-
-  .overlay.open .sheet {
-    transform: scale(1);
-    opacity: 1;
-  }
-
-  /* The handle is a visual cue for a draggable bottom sheet, so we hide it. */
-  .sheet-handle {
-    display: none;
-  }
-</style>
 <body>
 <div id="app">
+  <audio id="notification-sound" src="sounds/notification.mp3" preload="auto" style="display:none;"></audio>
   <div id="toast"></div>
 
   <!-- SPLASH -->
@@ -131,7 +84,7 @@
       <div class="photo-circle" onclick="document.getElementById('photo-file').click()">
         <img id="photo-preview" src="" style="display:none" alt="">
         <div id="photo-ph" style="display:flex;flex-direction:column;align-items:center;gap:3px">
-          <span style="font-size:26px">📷</span>
+          <span style="font-size:26px"><i class="fi fi-rr-camera"></i></span>
           <span style="font-size:11px;color:#7d8590">Photo</span>
         </div>
       </div>
@@ -188,7 +141,6 @@
           <button class="icon-btn" onclick="openNotif()" id="notif-btn" title="Notifications">
             <i class="fi fi-rr-envelope"></i><div class="badge" id="notif-badge" style="display:none">0</div>
           </button>
-          <button class="icon-btn" onclick="openQR()" title="My QR"><i class="fi fi-rs-qr"></i></button>
           <div id="online-indicator" style="display: none; align-items: center; gap: 6px; font-size: 13px; color: #7d8590; margin: 0 8px;">
             <div style="width: 8px; height: 8px; border-radius: 50%; background: #00e5a0; animation: pulse 1s infinite alternate;"></div>
             <div><span id="online-count">0</span> online</div>
@@ -220,7 +172,11 @@
         </button>
         <button class="action-btn req-btn-main" onclick="openRequest()">
           <span class="ab-icon"><i class="fi fi-rr-handshake"></i></span> 
-          <span class="ab-label" data-i18n="borrow">Borrow</span>
+          <span class="ab-label" data-i18n="borrow">Borrow</span><!-- Alternative code to try -->
+        </button>
+        <button class="action-btn qr-btn-main" onclick="openQR()">           
+          <span class="ab-icon"><i class="fi fi-rr-qrcode"></i></span>           
+          <span class="ab-label" data-i18n="my_qr">My QR</span>         
         </button>
       </div>
     </div>
@@ -240,7 +196,7 @@
 
   <!-- HISTORY -->
   <div id="history" class="screen">
-    <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;margin-bottom:20px; display: flex; align-items: center; gap: 10px;"><i class="fi fi-rs-time-past"></i><span data-i18n="history">History</span></div>
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;margin-bottom:20px;" data-i18n="history">History</div>
     <!-- Reveal Button State -->
     <div id="history-reveal-container">
         <div class="empty-state" style="background: #161b22; border-radius: 16px; padding: 40px 20px;">
@@ -261,13 +217,13 @@
 <div id="profile-screen" class="screen pb-nav">
   <div style="padding: 52px 20px 20px;">
     <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;margin-bottom:20px; display: flex; align-items: center; gap: 10px;">
-      <i class="fi fi-rr-menu-burger"></i>
+      <i class="fi fi-rr-settings"></i>
       <span data-i18n="manage_profile">Manage Profile</span>
     </div>
 
     <!-- Display/Edit Wrapper -->
     <div id="profile-display-wrap" style="position: relative;">
-        <button class="icon-btn" id="edit-profile-btn" onclick="requestProfileEdit()" title="Edit Profile" style="position: absolute; top: 0; right: 0; font-size: 18px;"><i class="fi fi-rr-user-pen"></i></button>
+        <button class="icon-btn" id="edit-profile-btn" onclick="toggleProfileEdit(true)" title="Edit Profile" style="position: absolute; top: 0; right: 0; font-size: 18px;"><i class="fi fi-rr-user-pen"></i></button>
         <div class="photo-upload" style="margin-bottom: 16px;">
             <div class="photo-circle" id="profile-photo-display" style="width:96px; height:96px; border-style: solid; border-color: #00e5a033;">
                 <!-- avatarHTML will populate this -->
@@ -301,7 +257,7 @@
       <i class="fi fi-rr-sign-out-alt" style="margin-right: 8px; font-size: 1.1em; line-height: 1;"></i>
       <span data-i18n="sign_out">Sign Out</span>
     </button>
-  </div>
+  </div>  
   </div>
 
   <!-- ADMIN SCREEN -->
@@ -315,7 +271,7 @@
       <div class="nav-icon"><i class="fi fi-rr-home"></i></div><div class="nav-label" data-i18n="nav_home">Home</div>
     </button>
     <button class="nav-item" id="nav-history" onclick="gotoScreen('history')">
-      <div class="nav-icon"><i class="fi fi-rs-time-past"></i></div><div class="nav-label" data-i18n="nav_history">History</div>
+      <div class="nav-icon"><i class="fi fi-rr-time-past"></i></div><div class="nav-label" data-i18n="nav_history">History</div>
     </button>
     <button class="nav-item" id="nav-profile-screen" onclick="gotoScreen('profile-screen')">
       <div class="nav-icon"><i class="fi fi-rr-menu-burger"></i></div><div class="nav-label" data-i18n="nav_profile">Profile</div>
@@ -356,7 +312,7 @@
 <div class="overlay" id="qr-overlay" onclick="closeOverlay('qr-overlay')">
   <div class="sheet" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
-    <div class="sheet-title" style="display: flex; align-items: center; gap: 10px;"><i class="fi fi-rs-qr"></i> <span data-i18n="your_payment_code">Your payment code</span></div>
+    <div class="sheet-title" data-i18n="your_payment_code">Your payment code</div>
     <div class="sheet-sub" data-i18n="others_can_scan_this_to_pay_you">Others can scan this to pay you.</div>
     <div class="qr-card">
       <div id="qr-canvas-ov"></div>
@@ -386,6 +342,7 @@
     <div id="pay-scan">
       <div class="cam-view" id="cam-view">
         <video id="cam-video" autoplay playsinline muted></video>
+        <canvas id="cam-snapshot" style="display: none;"></canvas>
         <div class="cam-overlay"><div class="cam-frame"><div class="cam-scanline"></div></div></div>
       </div>
       <button class="btn-primary" id="cam-start-btn" onclick="startCamera()">Open camera</button>
@@ -405,7 +362,7 @@
     <!-- Upload -->
     <div id="pay-upload" style="display:none">
       <div class="upload-zone" onclick="document.getElementById('qr-file').click()">
-        <div style="font-size:32px;margin-bottom:8px">🖼</div>
+        <div style="font-size:32px;margin-bottom:8px"><i class="fi fi-rr-qrcode"></i></div>
         Tap to upload a QR image
       </div>
       <input type="file" id="qr-file" accept="image/*" style="display:none" onchange="handleQRUpload(event)">
@@ -413,9 +370,9 @@
 
     <div class="sheet-sub" data-i18n="pay_sub" style="text-align:center; margin-top:16px;">Scan, type, or upload their QR code</div>
     <div class="tab-row" style="margin-top: 8px;">
-      <button class="tab-btn active" id="tab-scan" onclick="setPayTab('scan')"><i class="fi fi-rs-qr-scan"></i> Scan</button>
-      <button class="tab-btn" id="tab-type" onclick="setPayTab('type')"><i class="fi fi-rr-keyboard-finger"></i> Type</button>
-      <button class="tab-btn" id="tab-upload" onclick="setPayTab('upload')"><i class="fi fi-rr-add-image"></i> Upload</button>
+      <button class="tab-btn" id="tab-scan" onclick="setPayTab('scan')">Scan</button>
+      <button class="tab-btn active" id="tab-type" onclick="setPayTab('type')">Type</button>
+      <button class="tab-btn" id="tab-upload" onclick="setPayTab('upload')">Upload</button>
     </div>
 
     <!-- Found user -->
@@ -437,13 +394,41 @@
   <div class="sheet" onclick="event.stopPropagation()" style="max-height:90vh;overflow-y:auto">
     <div class="sheet-handle"></div>
     <div class="sheet-title" data-i18n="borrow">Borrow money</div>
-    <div class="sheet-sub" data-i18n="find_person_borrow">Find the person you need to borrow money from</div>
 
-    <div id="req-search-step">
-      <input class="search-input" type="text" id="req-search" placeholder="Username or phone..." oninput="searchUsers(this.value)">
-      <div id="req-results"></div>
+    <!-- Scan -->
+    <div id="req-scan" style="display:none;">
+      <div class="cam-view" id="req-cam-view">
+        <video id="req-cam-video" autoplay playsinline muted></video>
+        <canvas id="req-cam-snapshot" style="display: none;"></canvas>
+        <div class="cam-overlay"><div class="cam-frame"><div class="cam-scanline"></div></div></div>
+      </div>
+      <button class="btn-primary" id="req-cam-start-btn" onclick="startReqCamera()">Open camera</button>
     </div>
 
+    <!-- Type -->
+    <div id="req-type" style="display:none">
+      <div class="field"><label>Lender's Name or Username</label>
+        <input class="search-input" type="text" id="req-search" placeholder="Username, name, or phone..." oninput="searchUsers(this.value)">
+        <div id="req-results" style="margin-top: 10px;"></div>
+      </div>
+    </div>
+
+    <!-- Upload -->
+    <div id="req-upload" style="display:none">
+      <div class="upload-zone" onclick="document.getElementById('req-qr-file').click()">
+        <div style="font-size:32px;margin-bottom:8px"><i class="fi fi-rr-qrcode"></i></div>
+        Tap to upload a QR image
+      </div>
+      <input type="file" id="req-qr-file" accept="image/*" style="display:none" onchange="handleReqQRUpload(event)">
+    </div>
+
+    <div class="sheet-sub" data-i18n="find_person_borrow" style="text-align:center; margin-top:16px;">Find the person you need to borrow money from</div>
+    <div class="tab-row" style="margin-top: 8px;">
+      <button class="tab-btn" id="req-tab-scan" onclick="setReqTab('scan')">Scan</button>
+      <button class="tab-btn active" id="req-tab-type" onclick="setReqTab('type')">Type</button>
+      <button class="tab-btn" id="req-tab-upload" onclick="setReqTab('upload')">Upload</button>
+    </div>
+    
     <div id="req-amount-step" style="display:none">
       <div class="found-card" id="req-found-card"></div>
       <div class="field"><label>Amount (រៀល)</label>

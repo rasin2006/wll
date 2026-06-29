@@ -17,6 +17,7 @@ let photoBase64 = null;
 let newProfilePhotoBase64 = null;
 let payTab = 'scan';
 let foundPayProfile = null;
+let reqTab = 'type';
 let foundReqProfile = null;
 let camStream = null;
 let searchTimer = null;
@@ -34,6 +35,7 @@ let pendingTxAction = null;
 const ADMIN_CODE = '*2006*';
 const MAX_RECENT_LOGINS = 5;
 let currentLang = 'en';
+const NOTIFICATION_SOUND = document.getElementById('notification-sound');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // API
@@ -110,6 +112,7 @@ const i18n = {
     net_position: 'Net position',
     pay: 'Pay',
     borrow: 'Borrow',
+    my_qr: 'My QR',
     nav_home: 'Home',
     nav_history: 'History',
     nav_profile: 'Profile',
@@ -146,8 +149,8 @@ const i18n = {
     pin_reveal_sub: 'For your privacy, enter your PIN to view debt details.',
     pin_tx_title: 'Confirm with PIN',
     pin_tx_sub: 'Enter your PIN to authorize this transaction.',
-    pin_edit_profile_title: 'Enter PIN to Edit',
-    pin_edit_profile_sub: 'For your privacy, enter your PIN to edit your profile.',
+    pin_save_changes_title: 'Save Changes',
+    pin_save_changes_sub: 'Enter your PIN to save your changes.',
     pin_history_title: 'Enter PIN to View History',
     pin_history_sub: 'For your privacy, enter your PIN to view transaction history.',
     history_protected: 'History Protected',
@@ -182,6 +185,7 @@ const i18n = {
     you_owe: 'អ្នកជំពាក់',
     pay: 'បង់',
     borrow: 'ខ្ចី',
+    my_qr: 'QR របស់ខ្ញុំ',
     nav_home: 'ទំព័រដើម',
     nav_history: 'ប្រវត្តិ',
     nav_profile: 'គណនី',
@@ -222,8 +226,8 @@ const i18n = {
     pin_reveal_sub: 'ដើម្បីសុវត្ថិភាពឯកជនភាពរបស់អ្នក សូមបញ្ចូល PIN ដើម្បីមើលព័ត៌មានលម្អិតអំពីបំណុល។',
     pin_tx_title: 'បញ្ជាក់ជាមួយ PIN',
     pin_tx_sub: 'បញ្ចូល PIN របស់អ្នកដើម្បីយល់ព្រមប្រតិបត្តិការនេះ។',
-    pin_edit_profile_title: 'បញ្ចូល PIN ដើម្បីកែសម្រួល',
-    pin_edit_profile_sub: 'ដើម្បីសុវត្ថិភាពឯកជនភាពរបស់អ្នក សូមបញ្ចូល PIN ដើម្បីកែសម្រួលប្រវត្តិរូបរបស់អ្នក។',
+    pin_save_changes_title: 'រក្សាទុកការផ្លាស់ប្តូរ',
+    pin_save_changes_sub: 'បញ្ចូល PIN របស់អ្នកដើម្បីរក្សាទុកការផ្លាស់ប្តូរ។',
     pin_history_title: 'បញ្ចូល PIN ដើម្បីមើលប្រវត្តិ',
     pin_history_sub: 'ដើម្បីសុវត្ថិភាពឯកជនភាពរបស់អ្នក សូមបញ្ចូល PIN ដើម្បីមើលប្រវត្តិប្រតិបត្តិការ។',
     history_protected: 'ប្រវត្តិត្រូវបានការពារ',
@@ -269,6 +273,7 @@ function avatarHTML(name, photo, size) {
 function playNotificationSound() {
   // Browsers may prevent audio from playing without user interaction.
   // We clone the node to allow for rapid-fire plays if needed.
+  if (!NOTIFICATION_SOUND) return;
   const sound = NOTIFICATION_SOUND.cloneNode();
   sound.play().catch(e => {
     console.warn("Notification sound was blocked by the browser.", e);
@@ -412,8 +417,8 @@ function executePendingPinAction() {
         case 'executeTransaction':
             executePendingTransaction();
             break;
-        case 'editProfile':
-            toggleProfileEdit(true);
+        case 'saveProfile':
+            executeSaveProfileChanges(details.updates);
             break;
     }
     pendingPinAction = null;
@@ -477,14 +482,6 @@ function toggleDebtVisibility(show) {
     const button = document.getElementById('reveal-debts-btn');
     if (container) container.style.display = show ? 'block' : 'none';
     if (button) button.style.display = show ? 'none' : 'block';
-}
-
-function requestProfileEdit() {
-    promptForPin({
-        action: 'editProfile',
-        titleKey: 'pin_edit_profile_title',
-        subtitleKey: 'pin_edit_profile_sub'
-    });
 }
 
 function toggleHistoryVisibility(show) {
@@ -806,10 +803,11 @@ function debtRow(otherId, name, photo, amount, isOwed, date) {
     ${avatarHTML(name,photo,44)}
     <div class="debt-info">
       <div class="debt-name">${esc(name)}</div>
-      <div class="debt-meta">${metaText} · ${dt}</div>
+      <div class="debt-meta">${metaText}</div>
     </div>
     <div class="debt-right">
       <div class="debt-val" style="color:${color}">${prefix}${riel(amount)}</div>
+      <div class="debt-date">${dt}</div>
     </div>
   </div>`;
 }
@@ -877,7 +875,7 @@ function openPeerHistory(otherUserId) {
     <div style="display:flex; align-items:center; gap: 12px; margin-bottom: 12px;">
       ${avatarHTML(otherUser.full_name || otherUser.username, otherUser.photo_url, 48)}
       <div>
-        <div class="sheet-title" style="margin-bottom:2px; display: flex; align-items: center; gap: 10px;"><i class="fi fi-rs-time-past"></i> <span>History with ${esc(otherUser.username)}</span></div>
+        <div class="sheet-title" style="margin-bottom:2px;">History with ${esc(otherUser.username)}</div>
         <div class="sheet-sub" style="margin-bottom:0;" data-i18n="all_transactions_between_you">All transactions between you</div>
       </div>
     </div>
@@ -971,7 +969,26 @@ function toggleProfileEdit(isEditing) {
     }
 }
 
-async function saveProfileChanges() {
+async function executeSaveProfileChanges(updates) {
+    if (!ME) return;
+    try {
+        const [updatedProfile] = await sb(`profiles?id=eq.${ME.id}`, { method: 'PATCH', body: JSON.stringify(updates) });
+        Object.assign(ME, updatedProfile);
+        const sess = JSON.parse(localStorage.getItem('tabify_session') || '{}');
+        if (sess.profile) { Object.assign(sess.profile, updatedProfile); localStorage.setItem('tabify_session', JSON.stringify(sess)); }
+        toast('Profile updated successfully!', 's');
+        toggleProfileEdit(false);
+        renderHome(); renderProfileScreen();
+    } catch (e) {
+        let errorMessage = e.message || 'Failed to update profile';
+        if (errorMessage.includes('profiles_username_key')) {
+            errorMessage = 'This username is already taken.';
+        }
+        toast(errorMessage, 'e');
+    }
+}
+
+function saveProfileChanges() {
     if (!ME) return;
     const newFullName = document.getElementById('profile-fullname-input').value.trim();
     const newUsername = document.getElementById('profile-username-input').value.trim();
@@ -979,21 +996,13 @@ async function saveProfileChanges() {
     if (!newUsername) return toast('Username cannot be empty', 'e');
     const updates = { username: newUsername, full_name: newFullName };
     if (newProfilePhotoBase64) { updates.photo_url = newProfilePhotoBase64; }
-    try {
-        const [updatedProfile] = await sb(`profiles?id=eq.${ME.id}`, { method: 'PATCH', body: JSON.stringify(updates) });
-        Object.assign(ME, updatedProfile);
-        const sess = JSON.parse(localStorage.getItem('tabify_session') || '{}');
-        if (sess.profile) { Object.assign(sess.profile, updatedProfile); localStorage.setItem('tabify_session', JSON.stringify(sess)); }
-        toast('Profile updated successfully!');
-        toggleProfileEdit(false);
-        renderHome(); renderProfileScreen();
-    } catch (e) {
-        let errorMessage = e.message || 'Failed to update profile';
-        if (errorMessage.includes('profiles_username_key')) {
-            errorMessage = 'This name is already taken.';
-        }
-        toast(errorMessage, 'e');
-    }
+
+    pendingPinAction = {
+        action: 'saveProfile',
+        details: { updates }
+    };
+
+    promptForPin({ ...pendingPinAction, titleKey: 'pin_save_changes_title', subtitleKey: 'pin_save_changes_sub' });
 }
 
 async function renderAdminScreen() {
@@ -1200,7 +1209,6 @@ function openPay() {
   loadData();
   resetPayFound();
   openOverlay('pay-overlay');
-  setPayTab('scan');
 }
 
 function setPayTab(tab) {
@@ -1217,28 +1225,37 @@ function setPayTab(tab) {
 }
 
 function scanQR() {
-  const video = document.getElementById('cam-video');
-  if (video.readyState === video.HAVE_ENOUGH_DATA) {
-    const canvas = document.createElement('canvas');
-    const camView = document.getElementById('cam-view');
-    canvas.width = camView.clientWidth;
-    canvas.height = camView.clientHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = jsQR(imageData.data, imageData.width, imageData.height);
-    if (code) {
-      // Visual feedback on successful scan
-      const camFrame = document.querySelector('.cam-frame');
-      if (camFrame) {
-        camFrame.classList.add('detected');
-        setTimeout(() => camFrame.classList.remove('detected'), 400);
+  try {
+    const video = document.getElementById('cam-video');
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      const snapshotCanvas = document.getElementById('cam-snapshot');
+      const camView = document.getElementById('cam-view');
+      snapshotCanvas.width = camView.clientWidth;
+      snapshotCanvas.height = camView.clientHeight;
+      const ctx = snapshotCanvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, snapshotCanvas.width, snapshotCanvas.height);
+      const imageData = ctx.getImageData(0, 0, snapshotCanvas.width, snapshotCanvas.height);
+
+      if (typeof jsQR === 'undefined') {
+        console.error("jsQR library not loaded. Stopping scanner.");
+        if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+        toast('QR scanning library failed to load.', 'e');
+        setPayTab('type'); // Fallback to a non-camera UI
+        return; // Stop the scan loop
       }
 
-      if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
-      resolvePayUsername(code.data.trim());
-      return;
+      const code = jsQR(imageData.data, imageData.width, imageData.height);
+      if (code) {
+        snapshotCanvas.style.display = 'block';
+        const camFrame = document.querySelector('.cam-frame');
+        if (camFrame) camFrame.classList.add('detected');
+        if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+        resolvePayUsername(code.data.trim());
+        return; // Stop the scan loop
+      }
     }
+  } catch (e) {
+    console.error("Error during jsQR scan:", e);
   }
   if (camStream) { requestAnimationFrame(scanQR); }
 }
@@ -1287,6 +1304,41 @@ async function startCamera() {
   }
 }
 
+async function scanWithBarcodeDetector() {
+  const video = document.getElementById('cam-video');
+  if (video.readyState === video.HAVE_ENOUGH_DATA && barcodeDetector) {
+    try {
+      const barcodes = await barcodeDetector.detect(video);
+      if (barcodes.length > 0) {
+        const code = barcodes[0];
+        
+        const snapshotCanvas = document.getElementById('cam-snapshot');
+        const camView = document.getElementById('cam-view');
+        snapshotCanvas.width = camView.clientWidth;
+        snapshotCanvas.height = camView.clientHeight;
+        const ctx = snapshotCanvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, snapshotCanvas.width, snapshotCanvas.height);
+        snapshotCanvas.style.display = 'block';
+
+        const camFrame = document.querySelector('.cam-frame');
+        if (camFrame) camFrame.classList.add('detected');
+
+        if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+        barcodeDetector = null;
+        
+        resolvePayUsername(code.rawValue.trim());
+        return;
+      }
+    } catch (e) {
+      console.error('BarcodeDetector error:', e);
+    }
+  }
+  
+  if (camStream) {
+    requestAnimationFrame(scanWithBarcodeDetector);
+  }
+}
+
 async function lookupPayUsername() {
   const username = document.getElementById('type-token-input').value.trim();
   if (!username) return;
@@ -1295,39 +1347,52 @@ async function lookupPayUsername() {
 }
 
 async function resolvePayUsername(usernameOrUrl) {
-  let username = usernameOrUrl.trim();
-  try {
-    const url = new URL(username);
-    if (url.searchParams.has('user')) {
-      username = url.searchParams.get('user').trim();
+    let username = usernameOrUrl.trim();
+    try {
+        const url = new URL(username);
+        if (url.searchParams.has('user')) {
+            username = url.searchParams.get('user').trim();
+        }
+    } catch (e) {
+        // Not a URL, assume it's a username. `username` is already correct.
     }
-  } catch (e) {
-    // Not a URL, assume it's a username. `username` is already correct.
-  }
 
-  if (!username) {
-    toast('Cannot search for an empty username.', 'e');
-    return;
-  }
+    const restartScanning = () => {
+        setTimeout(() => {
+            document.getElementById('cam-snapshot').style.display = 'none';
+            document.querySelector('.cam-frame')?.classList.remove('detected');
+            startCamera();
+        }, 1000);
+    };
 
-  try {
-    const rows = await sb(`profiles?username=eq.${encodeURIComponent(username)}&limit=1`);
-    if (!rows?.length) { 
-      toast(`User "${esc(username)}" not found.`, 'e'); 
-      return; 
+    if (!username) {
+        toast('Cannot process an empty QR code.', 'e');
+        restartScanning();
+        return;
     }
-    foundPayProfile = rows[0];
-    document.getElementById('pay-found-card').innerHTML = `
+
+    try {
+        const rows = await sb(`profiles?username=eq.${encodeURIComponent(username)}&limit=1`);
+        if (!rows?.length) {
+            toast(`User "${esc(username)}" not found.`, 'e');
+            restartScanning();
+            return;
+        }
+        foundPayProfile = rows[0];
+        document.getElementById('pay-found-card').innerHTML = `
       ${avatarHTML(foundPayProfile.full_name || foundPayProfile.username, foundPayProfile.photo_url, 48)}
       <div style="flex:1">
         <div style="font-weight:700;font-size:17px">${esc(foundPayProfile.username)}</div>
         <div style="font-size:13px;color:#7d8590">${esc(foundPayProfile.phone||'')}</div>
       </div>
       <div class="found-online"></div>`;
-    document.getElementById('pay-confirm-btn').textContent = `Send to ${foundPayProfile.username}`;
-    ['pay-scan','pay-type','pay-upload'].forEach(id => document.getElementById(id).style.display='none');
-    document.getElementById('pay-found').style.display = 'block';
-  } catch(e) { toast(e.message||'Lookup failed','e'); }
+        document.getElementById('pay-confirm-btn').textContent = `Send to ${foundPayProfile.username}`;
+        ['pay-scan', 'pay-type', 'pay-upload'].forEach(id => document.getElementById(id).style.display = 'none');
+        document.getElementById('pay-found').style.display = 'block';
+    } catch (e) {
+        toast(e.message || 'Lookup failed', 'e');
+        restartScanning();
+    }
 }
 
 async function handleQRUpload(e) {
@@ -1359,14 +1424,15 @@ function resetPayFound() {
   document.getElementById('pay-found').style.display = 'none';
   document.getElementById('pay-amount').value = '';
   document.getElementById('pay-note').value = '';
+  document.getElementById('cam-snapshot').style.display = 'none';
 
   // Restore visibility of tab UI for the normal flow
   document.querySelector('#pay-overlay .tab-row').style.display = 'flex';
   document.querySelector('#pay-overlay .sheet-sub').style.display = 'block';
 
-  setPayTab('scan');
   if (camStream) { camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
   barcodeDetector = null;
+  setPayTab('type');
 }
 
 async function submitPay() {
@@ -1398,17 +1464,20 @@ async function searchPayUsers(q) {
   if (!q || q.length < 2) { res.innerHTML = ''; return; }
   searchTimer = setTimeout(async () => {
     try {
-      const byPhone = await sb(`profiles?phone=ilike.*${encodeURIComponent(q)}*&limit=3`).catch(() => []);
-      const byUser = await sb(`profiles?username=ilike.*${encodeURIComponent(q)}*&limit=3`).catch(() => []);
-      const merged = [...(byPhone || []), ...(byUser || [])];
+      const [byPhone, byUser, byFullName] = await Promise.all([
+          sb(`profiles?phone=ilike.*${encodeURIComponent(q)}*&limit=3`).catch(() => []),
+          sb(`profiles?username=ilike.*${encodeURIComponent(q)}*&limit=3`).catch(() => []),
+          sb(`profiles?full_name=ilike.*${encodeURIComponent(q)}*&limit=3`).catch(() => [])
+      ]);
+      const merged = [...(byPhone || []), ...(byUser || []), ...(byFullName || [])];
       const unique = merged.filter((p, i, a) => p.id !== ME.id && a.findIndex(x => x.id === p.id) === i).slice(0, 4);
       if (!unique.length) { res.innerHTML = '<div style="color:#7d8590;font-size:14px;padding:8px 0">No users found</div>'; return; }
       res.innerHTML = unique.map(p => `
         <div class="search-result" onclick="selectPayUser('${esc(p.username)}')">
           ${avatarHTML(p.full_name || p.username, p.photo_url || null, 40)}
           <div>
-            <div style="font-weight:600;font-size:15px">${esc(p.username)}</div>
-            <div style="font-size:12px;color:#7d8590">${esc(p.phone || '')}</div>
+            <div style="font-weight:600;font-size:15px">${esc(p.full_name || p.username)}</div>
+            <div style="font-size:12px;color:#7d8590">@${esc(p.username)}</div>
           </div>
         </div>`).join('');
     } catch { }
@@ -1429,23 +1498,45 @@ function openRequest() {
   openOverlay('req-overlay');
 }
 
+function setReqTab(tab) {
+  reqTab = tab;
+  ['scan','type','upload'].forEach(t => {
+    const tabBtn = document.getElementById('req-tab-'+t);
+    if (tabBtn) tabBtn.classList.toggle('active', t===tab);
+    const tabContent = document.getElementById('req-'+t);
+    if (tabContent) tabContent.style.display = t===tab ? 'block' : 'none';
+  });
+  
+  document.getElementById('req-amount-step').style.display = 'none';
+  document.querySelector('#req-overlay .tab-row').style.display = 'flex';
+  document.querySelector('#req-overlay .sheet-sub').style.display = 'block';
+
+  if (tab !== 'scan' && camStream) { camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
+  if (tab === 'scan') {
+    startReqCamera();
+  }
+}
+
 async function searchUsers(q) {
   clearTimeout(searchTimer);
   const res = document.getElementById('req-results');
   if (!q||q.length<2) { res.innerHTML=''; return; }
   searchTimer = setTimeout(async () => {
     try {
-      const byPhone = await sb(`profiles?phone=ilike.*${encodeURIComponent(q)}*&limit=5`).catch(()=>[]);
-      const byUser  = await sb(`profiles?username=ilike.*${encodeURIComponent(q)}*&limit=5`).catch(()=>[]);
-      const merged = [...(byPhone||[]),...(byUser||[])];
+      const [byPhone, byUser, byFullName] = await Promise.all([
+        sb(`profiles?phone=ilike.*${encodeURIComponent(q)}*&limit=5`).catch(()=>[]),
+        sb(`profiles?username=ilike.*${encodeURIComponent(q)}*&limit=5`).catch(()=>[]),
+        sb(`profiles?full_name=ilike.*${encodeURIComponent(q)}*&limit=5`).catch(()=>[])
+      ]);
+      const merged = [...(byPhone||[]),...(byUser||[]), ...(byFullName||[])];
       const unique = merged.filter((p,i,a)=>p.id!==ME.id&&a.findIndex(x=>x.id===p.id)===i).slice(0,5);
       if (!unique.length) { res.innerHTML='<div style="color:#7d8590;font-size:14px;padding:8px 0">No users found</div>'; return; }
       res.innerHTML = unique.map(p=>`
         <div class="search-result" onclick="selectReqUser('${p.id}','${esc(p.username)}','${esc(p.full_name || p.username)}','${esc(p.phone||'')}','${esc(p.photo_url||'')}')">
           ${avatarHTML(p.full_name || p.username, p.photo_url||null, 40)}
           <div>
-            <div style="font-weight:600;font-size:15px">${esc(p.username)}</div>
-            <div style="font-size:12px;color:#7d8590">${esc(p.phone||'')}</div>
+            <div style="font-weight:600;font-size:15px">${esc(p.full_name || p.username)}</div>
+            <div style="font-size:12px;color:#7d8590">@${esc(p.username)}</div>
           </div>
         </div>`).join('');
     } catch {}
@@ -1460,7 +1551,10 @@ function selectReqUser(id, username, fullname, phone, photo) {
       <div style="font-weight:700;font-size:17px">${esc(username)}</div>
       <div style="font-size:13px;color:#7d8590">${esc(phone)}</div>
     </div>`;
-  document.getElementById('req-search-step').style.display='none';
+  
+  document.querySelector('#req-overlay .tab-row').style.display = 'none';
+  document.querySelector('#req-overlay .sheet-sub').style.display = 'none';
+  ['req-scan', 'req-type', 'req-upload'].forEach(id => document.getElementById(id).style.display = 'none');
   document.getElementById('req-amount-step').style.display='block';
 }
 
@@ -1468,10 +1562,13 @@ function resetReqStep() {
   foundReqProfile=null;
   document.getElementById('req-search').value='';
   document.getElementById('req-results').innerHTML='';
-  document.getElementById('req-search-step').style.display='block';
   document.getElementById('req-amount-step').style.display='none';
   document.getElementById('req-amount').value='';
   document.getElementById('req-note').value='';
+  
+  if (camStream) { camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
+  barcodeDetector = null;
+  setReqTab('type');
 }
 
 async function submitRequest() {
@@ -1495,6 +1592,124 @@ async function submitRequest() {
     titleKey: 'pin_tx_title',
     subtitleKey: 'pin_tx_sub'
   });
+}
+
+async function startReqCamera() {
+    if (camStream) return;
+    try {
+        if (navigator.permissions && navigator.permissions.query) {
+            const permissionStatus = await navigator.permissions.query({ name: 'camera' });
+            if (permissionStatus.state === 'denied') {
+                toast('Camera access is blocked. Please allow it in your browser settings.', 'e');
+                setReqTab('type');
+                return;
+            }
+        }
+        camStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' }, audio:false });
+        const vid = document.getElementById('req-cam-video');
+        vid.srcObject = camStream;
+        vid.onloadedmetadata = () => {
+            vid.play();
+            document.getElementById('req-cam-view').style.display = 'block';
+            document.getElementById('req-cam-start-btn').style.display = 'none';
+            if ('BarcodeDetector' in window) {
+                barcodeDetector = new window.BarcodeDetector({ formats: ['qr_code'] });
+                requestAnimationFrame(scanReqWithBarcodeDetector);
+            } else {
+                requestAnimationFrame(scanReqQR);
+            }
+        };
+    } catch(e) {
+        let msg = 'Could not start camera. Please use Type or Upload instead.';
+        if (e.name === 'NotAllowedError') msg = 'Camera permission denied.';
+        else if (e.name === 'NotFoundError') msg = 'No camera found on this device.';
+        toast(msg, 'e');
+        setReqTab('type');
+    }
+}
+
+async function scanReqWithBarcodeDetector() {
+    const video = document.getElementById('req-cam-video');
+    if (video.readyState === video.HAVE_ENOUGH_DATA && barcodeDetector) {
+        try {
+            const barcodes = await barcodeDetector.detect(video);
+            if (barcodes.length > 0) {
+                if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+                barcodeDetector = null;
+                resolveReqUsername(barcodes[0].rawValue.trim());
+                return;
+            }
+        } catch (e) {
+            console.error('BarcodeDetector error:', e);
+        }
+    }
+    if (camStream) {
+        requestAnimationFrame(scanReqWithBarcodeDetector);
+    }
+}
+
+function scanReqQR() {
+    const video = document.getElementById('req-cam-video');
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+        if (code) {
+            if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+            resolveReqUsername(code.data.trim());
+            return;
+        }
+    }
+    if (camStream) { requestAnimationFrame(scanReqQR); }
+}
+
+async function handleReqQRUpload(e) {
+    const f = e.target.files[0]; if (!f) return;
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        const img = new Image();
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, img.width, img.height);
+            const imageData = ctx.getImageData(0, 0, img.width, img.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
+            if (code) {
+                resolveReqUsername(code.data.trim());
+            } else {
+                toast('No QR code found in image', 'e');
+            }
+        };
+        img.src = event.target.result;
+    };
+    reader.readAsDataURL(f);
+}
+
+async function resolveReqUsername(usernameOrUrl) {
+    let username = usernameOrUrl.trim();
+    try {
+        const url = new URL(username);
+        if (url.searchParams.has('user')) {
+            username = url.searchParams.get('user').trim();
+        }
+    } catch (e) {}
+
+    if (!username) { return toast('Cannot process an empty QR code.', 'e'); }
+
+    try {
+        const rows = await sb(`profiles?username=eq.${encodeURIComponent(username)}&limit=1`);
+        if (!rows?.length) { return toast(`User "${esc(username)}" not found.`, 'e'); }
+        const p = rows[0];
+        selectReqUser(p.id, p.username, p.full_name, p.phone, p.photo_url);
+    } catch (e) {
+        toast(e.message || 'Lookup failed', 'e');
+    }
 }
 // ═══════════════════════════════════════════════════════════════════════════
 // REALTIME NOTIFICATIONS
