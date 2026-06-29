@@ -245,9 +245,9 @@
             </div>
             <input type="file" id="profile-photo-file" accept="image/*" style="display:none">
         </div>
-        <div class="field"><label data-i18n="full_name">Full Name</label><input type="text" id="profile-fullname-input"></div>
-        <div class="field"><label data-i18n="username">Username</label><input type="text" id="profile-username-input"></div>
-        <div class="field"><label data-i18n="phone">Phone</label><input type="text" id="profile-phone-input" disabled><div style="font-size:11px; color:#7d8590; margin-top:4px;" data-i18n="phone_number_disabled">Phone number cannot be changed.</div></div> 
+        <div class="field"><label data-i18n="full_name">Full Name</label><input type="text" id="profile-fullname-input" autocomplete="off"></div>
+        <div class="field"><label data-i18n="username">Username</label><input type="text" id="profile-username-input" autocomplete="off"></div>
+        <div class="field"><label data-i18n="phone">Phone</label><input type="text" id="profile-phone-input" disabled autocomplete="off"><div style="font-size:11px; color:#7d8590; margin-top:4px;" data-i18n="phone_number_disabled">Phone number cannot be changed.</div></div> 
         <button class="btn-primary" onclick="saveProfileChanges()" data-i18n="save_changes">Save Changes</button>
         <button class="btn-ghost" onclick="toggleProfileEdit(false)" style="margin-top:10px" data-i18n="cancel">Cancel</button>
       </div>
@@ -352,7 +352,7 @@
     <div id="pay-type" style="display:none">
       <div class="field"><label>Recipient's Username</label>
         <div class="token-input-row">
-          <input class="token-input" id="type-token-input" placeholder="e.g. alex_king" onkeydown="if(event.key==='Enter')lookupPayUsername()" oninput="searchPayUsers(this.value)">
+          <input class="token-input" id="type-token-input" placeholder="e.g. alex_king" onkeydown="if(event.key==='Enter')lookupPayUsername()" oninput="searchPayUsers(this.value)" autocomplete="off">
           <button class="find-btn" onclick="lookupPayUsername()">Find</button>
         </div>
       </div>
@@ -379,10 +379,10 @@
     <div id="pay-found" style="display:none">
       <div class="found-card" id="pay-found-card"></div>
       <div class="field"><label>Amount (រៀល)</label>
-        <input class="amount-input" type="number" inputmode="numeric" id="pay-amount" placeholder="0">
+        <input class="amount-input" type="number" inputmode="numeric" id="pay-amount" placeholder="0" autocomplete="off">
         <div class="amount-hint">Enter amount in Khmer Riel</div>
       </div>
-      <input class="note-input" type="text" id="pay-note" placeholder="Note (optional)">
+      <input class="note-input" type="text" id="pay-note" placeholder="Note (optional)" autocomplete="off">
       <button class="btn-primary" id="pay-confirm-btn" onclick="submitPay()">Send payment request</button>
       <div class="back-link" onclick="resetPayFound()">← Back</div>
     </div>
@@ -408,7 +408,7 @@
     <!-- Type -->
     <div id="req-type" style="display:none">
       <div class="field"><label>Lender's Name or Username</label>
-        <input class="search-input" type="text" id="req-search" placeholder="Username, name, or phone..." oninput="searchUsers(this.value)">
+        <input class="search-input" type="text" id="req-search" placeholder="Username, name, or phone..." oninput="searchUsers(this.value)" autocomplete="off">
         <div id="req-results" style="margin-top: 10px;"></div>
       </div>
     </div>
@@ -432,10 +432,10 @@
     <div id="req-amount-step" style="display:none">
       <div class="found-card" id="req-found-card"></div>
       <div class="field"><label>Amount (រៀល)</label>
-        <input class="amount-input" type="number" inputmode="numeric" id="req-amount" placeholder="0">
+        <input class="amount-input" type="number" inputmode="numeric" id="req-amount" placeholder="0" autocomplete="off">
         <div class="amount-hint" data-i18n="enter_amount_khmer">Enter amount in Khmer Riel</div>
       </div>
-      <input class="note-input" type="text" id="req-note" placeholder="What's this for?">
+      <input class="note-input" type="text" id="req-note" placeholder="What's this for?" autocomplete="off">
       <button class="btn-primary" onclick="submitRequest()">Record Debt</button>
       <div class="back-link" onclick="resetReqStep()">← Search again</div>
     </div>
