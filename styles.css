@@ -57,6 +57,15 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .pin-dot{width:clamp(44px, 11vw, 52px);height:clamp(48px, 12vw, 56px);border-radius:12px;background:#161b22;border:1.5px solid #21262d;display:flex;align-items:center;justify-content:center;font-size:clamp(22px, 5.8vw, 28px);font-weight:700;color:#e6edf3;transition:border-color .2s}
 .pin-dot.filled{border-color:#00e5a033;color:#00e5a0}
 .numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:260px;margin:0 auto}
+.pin-display.shake {
+  animation: shake-anim 0.5s ease-in-out;
+}
+@keyframes shake-anim {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-6px); }
+  20%, 40%, 60%, 80% { transform: translateX(6px); }
+}
+
 .numpad-btn{padding:14px;background:#161b22;border:1.5px solid #21262d;border-radius:12px;font-size:clamp(18px, 4.6vw, 22px);font-weight:600;color:#e6edf3;transition:background .15s,border-color .15s}
 .numpad-btn:active{background:#21262d;border-color:#30363d}
 .numpad-btn.del{font-size:18px;color:#7d8590}
@@ -153,8 +162,9 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 
 /* ── Pay sheet ── */
 .tab-row{display:flex;gap:8px;margin-bottom:20px}
-.tab-btn{flex:1;padding:10px;border-radius:10px;border:1.5px solid #21262d;background:#0d1117;color:#7d8590;font-weight:600;font-size:15px;transition:all .15s}
+.tab-btn{flex:1;padding:10px;border-radius:10px;border:1.5px solid #21262d;background:#0d1117;color:#7d8590;font-weight:600;font-size:15px;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px}
 .tab-btn.active{border-color:#00e5a0;background:#0f2e1e;color:#00e5a0}
+.tab-btn i{font-size:1.2em;line-height:1}
 .token-input-row{display:flex;gap:8px}
 .token-input{flex:1;padding:13px 14px;background:#0d1117;border:1.5px solid #21262d;border-radius:12px;color:#e6edf3;font-size:17px;letter-spacing:.1em;font-family:monospace;transition:border-color .2s}
 .token-input:focus{border-color:#00e5a0}

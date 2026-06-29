@@ -20,9 +20,16 @@ let foundPayProfile = null;
 let foundReqProfile = null;
 let camStream = null;
 let searchTimer = null;
+let barcodeDetector = null;
 let sbClient = null;
 let realtimeChannel = null;
 let presenceChannel = null;
+
+let promptPinVal = '';
+let pendingPinAction = null;
+let debtsRevealed = false;
+let historyRevealed = false;
+let pendingTxAction = null;
 
 const ADMIN_CODE = '*2006*';
 const MAX_RECENT_LOGINS = 5;
@@ -125,7 +132,28 @@ const i18n = {
     no_transactions_yet: 'No transactions yet',
     language: 'Language',
     all_clean_title: 'All clean',
-    all_clean_sub: 'No active debts.\nHit Pay or Borrow to get started.'
+    all_clean_sub: 'No active debts.\nHit Pay or Borrow to get started.',
+    phone_number_disabled: 'Phone number is disabled',
+    save_changes: 'Save changes',
+    cancel: 'Cancel',
+    sign_out: 'Sign out',
+    find_person_borrow: 'Find someone to borrow from',
+    find_person_pay: 'Find someone to pay',
+    enter_amount_khmer: 'Enter amount in KHR',
+    show_debt_details: 'Show Debt Details',
+    hide_debt_details: 'Hide Debt Details',
+    pin_reveal_title: 'Enter PIN to Reveal',
+    pin_reveal_sub: 'For your privacy, enter your PIN to view debt details.',
+    pin_tx_title: 'Confirm with PIN',
+    pin_tx_sub: 'Enter your PIN to authorize this transaction.',
+    pin_edit_profile_title: 'Enter PIN to Edit',
+    pin_edit_profile_sub: 'For your privacy, enter your PIN to edit your profile.',
+    pin_history_title: 'Enter PIN to View History',
+    pin_history_sub: 'For your privacy, enter your PIN to view transaction history.',
+    history_protected: 'History Protected',
+    history_protected_sub: 'Your transaction history is hidden for privacy.',
+    reveal_history: 'Reveal History',
+    hide_history: 'Hide History',
   },
   km: {
     // Auth
@@ -186,7 +214,23 @@ const i18n = {
     paid_you: 'បានសងអ្នក',
     find_person_borrow: 'ស្វែងរកមនុស្សដែលអ្នកចង់ខ្ចីប្រាក់ពីពួកគេ',
     find_person_pay: 'ស្វែងរកមនុស្សដែលអ្្នកចង់បង់ប្រាក់ឱ្យពួកគេ',
-    enter_amount_khmer: 'បញ្ចូលចំនុំទឹកប្រាក់ជារៀល'
+    enter_amount_khmer: 'បញ្ចូលចំនុំទឹកប្រាក់ជារៀល',
+    sign_out: 'ចាកចេញ',
+    show_debt_details: 'បង្ហាញព័ត៌មានលម្អិតអំពីបំណុល',
+    hide_debt_details: 'លាក់ព័ត៌មានលម្អិតអំពីបំណុល',
+    pin_reveal_title: 'បញ្ចូល PIN ដើម្បីបង្ហាញ',
+    pin_reveal_sub: 'ដើម្បីសុវត្ថិភាពឯកជនភាពរបស់អ្នក សូមបញ្ចូល PIN ដើម្បីមើលព័ត៌មានលម្អិតអំពីបំណុល។',
+    pin_tx_title: 'បញ្ជាក់ជាមួយ PIN',
+    pin_tx_sub: 'បញ្ចូល PIN របស់អ្នកដើម្បីយល់ព្រមប្រតិបត្តិការនេះ។',
+    pin_edit_profile_title: 'បញ្ចូល PIN ដើម្បីកែសម្រួល',
+    pin_edit_profile_sub: 'ដើម្បីសុវត្ថិភាពឯកជនភាពរបស់អ្នក សូមបញ្ចូល PIN ដើម្បីកែសម្រួលប្រវត្តិរូបរបស់អ្នក។',
+    pin_history_title: 'បញ្ចូល PIN ដើម្បីមើលប្រវត្តិ',
+    pin_history_sub: 'ដើម្បីសុវត្ថិភាពឯកជនភាពរបស់អ្នក សូមបញ្ចូល PIN ដើម្បីមើលប្រវត្តិប្រតិបត្តិការ។',
+    history_protected: 'ប្រវត្តិត្រូវបានការពារ',
+    history_protected_sub: 'ប្រវត្តិប្រតិបត្តិការរបស់អ្នកត្រូវបានលាក់ដើម្បីឯកជនភាព។',
+    reveal_history: 'បង្ហាញប្រវត្តិ',
+    hide_history: 'លាក់ប្រវត្តិ',
+    all_transactions_between_you: 'ប្រតិបត្តិការទាំងអស់រវាងអ្នក',
   }
 };
 
@@ -279,6 +323,185 @@ function updatePinDisplay() {
 }
 
 function clearPin() { pinVal = ''; updatePinDisplay(); }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GENERIC PIN PROMPT
+// ═══════════════════════════════════════════════════════════════════════════
+function buildPromptNumpad() {
+  const pad = document.getElementById('prompt-numpad');
+  if (!pad) return;
+  const keys = ['1','2','3','4','5','6','7','8','9','*','0','⌫'];
+  pad.innerHTML = keys.map(k => {
+    const cls = k === '⌫' ? 'numpad-btn del' : 'numpad-btn';
+    return `<button class="${cls}" onclick="promptNumpadPress('${k}')">${k}</button>`;
+  }).join('');
+}
+
+function promptNumpadPress(k) {
+  if (k === '⌫') {
+    promptPinVal = promptPinVal.slice(0, -1);
+  } else if (promptPinVal.length < 4) {
+    promptPinVal += k;
+  }
+  
+  updatePromptPinDisplay();
+
+  if (promptPinVal.length === 4) {
+    // A slight delay to allow the user to see the 4th dot.
+    setTimeout(checkPromptPin, 200);
+  }
+}
+
+function updatePromptPinDisplay() {
+  [0,1,2,3].forEach(i => {
+    const d = document.getElementById('ppd'+i);
+    if (!d) return;
+    if (i < promptPinVal.length) { d.textContent = '●'; d.classList.add('filled'); }
+    else { d.textContent = '–'; d.classList.remove('filled'); }
+  });
+}
+
+function clearPromptPin() {
+  promptPinVal = '';
+  updatePromptPinDisplay();
+}
+
+function checkPromptPin() {
+  if (!ME || !ME.pin_hash) {
+    toast('Cannot verify PIN.', 'e');
+    return;
+  }
+  
+  if (atob(ME.pin_hash) === promptPinVal) {
+    toast('PIN correct.', 's');
+    executePendingPinAction();
+  } else {
+    toast('Incorrect PIN', 'e');
+    const display = document.getElementById('prompt-pin-display');
+    if (display) {
+      display.classList.add('shake');
+      setTimeout(() => {
+        display.classList.remove('shake');
+        clearPromptPin();
+      }, 500);
+    } else {
+      clearPromptPin();
+    }
+  }
+}
+
+function promptForPin(config) {
+  pendingPinAction = config;
+  document.getElementById('pin-prompt-title').innerHTML = t(config.titleKey);
+  document.getElementById('pin-prompt-sub').innerHTML = t(config.subtitleKey);
+  clearPromptPin();
+  openOverlay('pin-prompt-overlay');
+}
+
+function executePendingPinAction() {
+    if (!pendingPinAction) return;
+    closeOverlay('pin-prompt-overlay');
+    const { action, details } = pendingPinAction;
+    switch(action) {
+        case 'revealDebts':
+            toggleDebtVisibility(true);
+            break;
+        case 'revealHistory':
+            toggleHistoryVisibility(true);
+            break;
+        case 'executeTransaction':
+            executePendingTransaction();
+            break;
+        case 'editProfile':
+            toggleProfileEdit(true);
+            break;
+    }
+    pendingPinAction = null;
+}
+
+function closePinPrompt() {
+    closeOverlay('pin-prompt-overlay');
+    pendingPinAction = null;
+    clearPromptPin();
+}
+
+async function executePendingTransaction() {
+    if (!pendingTxAction) return;
+    const { type, details } = pendingTxAction;
+    const { to_id, to_name, amount, note } = details;
+    const payBtn = document.getElementById('pay-confirm-btn');
+    const reqBtn = document.querySelector('#req-amount-step .btn-primary');
+    if (payBtn) { payBtn.disabled = true; payBtn.textContent = 'Sending…'; }
+    if (reqBtn) { reqBtn.disabled = true; reqBtn.textContent = 'Recording…'; }
+    try {
+        await sb('transactions', {
+            method: 'POST',
+            body: JSON.stringify({
+                type: type, from_id: ME.id, to_id: to_id,
+                from_name: ME.full_name || ME.username, to_name: to_name,
+                amount, note, status: 'pending'
+            })
+        });
+        if (type === 'pay') {
+            closeOverlay('pay-overlay');
+            toast(`Payment request sent to ${to_name} ✅`);
+        } else { // request
+            closeOverlay('req-overlay');
+            toast(`Debt to ${to_name} recorded ✅`);
+        }
+        await loadData();
+    } catch (e) {
+        toast(e.message || 'Transaction failed', 'e');
+    } finally {
+        if (payBtn) { payBtn.disabled = false; payBtn.textContent = `Send to ${foundPayProfile?.username || ''}`; }
+        if (reqBtn) { reqBtn.disabled = false; reqBtn.textContent = 'Record Debt'; }
+        pendingTxAction = null;
+        clearPromptPin();
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DEBT VISIBILITY & PROTECTED ACTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+function promptForPinReveal() {
+  promptForPin({
+    action: 'revealDebts',
+    titleKey: 'pin_reveal_title',
+    subtitleKey: 'pin_reveal_sub'
+  });
+}
+
+function toggleDebtVisibility(show) {
+    debtsRevealed = show;
+    const container = document.getElementById('debt-details-container');
+    const button = document.getElementById('reveal-debts-btn');
+    if (container) container.style.display = show ? 'block' : 'none';
+    if (button) button.style.display = show ? 'none' : 'block';
+}
+
+function requestProfileEdit() {
+    promptForPin({
+        action: 'editProfile',
+        titleKey: 'pin_edit_profile_title',
+        subtitleKey: 'pin_edit_profile_sub'
+    });
+}
+
+function toggleHistoryVisibility(show) {
+    historyRevealed = show;
+    const container = document.getElementById('history-content-container');
+    const revealUI = document.getElementById('history-reveal-container');
+    if (container) container.style.display = show ? 'block' : 'none';
+    if (revealUI) revealUI.style.display = show ? 'none' : 'block';
+}
+
+function requestHistoryReveal() {
+    promptForPin({
+        action: 'revealHistory',
+        titleKey: 'pin_history_title',
+        subtitleKey: 'pin_history_sub'
+    });
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // AUTH MODE
@@ -544,6 +767,9 @@ function renderHome() {
   document.getElementById('total-owed').textContent = riel(totalOwed);
   document.getElementById('total-iowe').textContent = riel(totalIOwe);
 
+  // Ensure debt visibility is correctly handled on render
+  toggleDebtVisibility(debtsRevealed);
+
   const wrap = document.getElementById('debt-list-wrap');
   let html = '';
 
@@ -594,8 +820,14 @@ function debtRow(otherId, name, photo, amount, isOwed, date) {
 function renderHistory() {
   const el = document.getElementById('tx-list');
   if (!el) return;
-  if (!allTx.length) { el.innerHTML='<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-sub" data-i18n="tx_empty_sub">No transactions yet</div></div>'; return; }
-  el.innerHTML = allTx.map(tx => renderTxItem(tx)).join('');
+  if (!allTx.length) {
+    el.innerHTML='<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-sub" data-i18n="no_transactions_yet">No transactions yet</div></div>';
+  } else {
+    el.innerHTML = allTx.map(tx => renderTxItem(tx)).join('');
+  }
+  
+  toggleHistoryVisibility(historyRevealed);
+  applyTranslations();
 }
 
 function renderTxItem(tx) {
@@ -645,7 +877,7 @@ function openPeerHistory(otherUserId) {
     <div style="display:flex; align-items:center; gap: 12px; margin-bottom: 12px;">
       ${avatarHTML(otherUser.full_name || otherUser.username, otherUser.photo_url, 48)}
       <div>
-        <div class="sheet-title" style="margin-bottom:2px;">History with ${esc(otherUser.username)}</div>
+        <div class="sheet-title" style="margin-bottom:2px; display: flex; align-items: center; gap: 10px;"><i class="fi fi-rs-time-past"></i> <span>History with ${esc(otherUser.username)}</span></div>
         <div class="sheet-sub" style="margin-bottom:0;" data-i18n="all_transactions_between_you">All transactions between you</div>
       </div>
     </div>
@@ -662,11 +894,11 @@ function openPeerHistory(otherUserId) {
   if (actionsEl) {
       actionsEl.innerHTML = `
         <button class="action-btn pay-btn-main" onclick="payUserFromHistory('${esc(otherUser.username)}')">
-          <span class="ab-icon">↑</span> 
+          <span class="ab-icon"><i class="fi fi-rr-wallet-arrow"></i></span> 
           <span class="ab-label" data-i18n="pay">Pay</span>
         </button>
         <button class="action-btn req-btn-main" onclick="borrowFromUserInHistory('${otherUser.id}','${esc(otherUser.username)}','${esc(otherUser.full_name || otherUser.username)}','${esc(otherUser.phone||'')}','${esc(otherUser.photo_url||'')}')">
-          <span class="ab-icon">💸</span> 
+          <span class="ab-icon"><i class="fi fi-rr-handshake"></i></span> 
           <span class="ab-label" data-i18n="borrow">Borrow</span>
         </button>
       `;
@@ -728,11 +960,6 @@ function renderProfileScreen() {
       photoPreview.style.display = 'none';
       photoPh.style.display = 'flex';
   }
-
-  // Part 3: QR Code Display
-  document.getElementById('profile-qr-avatar').innerHTML = avatarHTML(ME.full_name || ME.username, ME.photo_url, 64);
-  document.getElementById('profile-qr-token-val').textContent = '@' + ME.username;
-  drawQR('qr-canvas-profile', ME.username || '', 200);
 }
 
 function toggleProfileEdit(isEditing) {
@@ -930,7 +1157,7 @@ async function openNotif() {
     }
     openOverlay('notif-overlay');
   } catch (e) {
-    toast('Could not refresh notifications.', 'e');
+    toast(e.message || 'Could not refresh notifications.', 'e');
   } finally {
     btn.disabled = false;
   }
@@ -1038,7 +1265,14 @@ async function startCamera() {
       vid.play();
       document.getElementById('cam-view').style.display = 'block';
       document.getElementById('cam-start-btn').style.display = 'none';
-      requestAnimationFrame(scanQR);
+      if ('BarcodeDetector' in window) {
+        console.log('Using native BarcodeDetector API.');
+        barcodeDetector = new window.BarcodeDetector({ formats: ['qr_code'] });
+        requestAnimationFrame(scanWithBarcodeDetector);
+      } else {
+        console.log('BarcodeDetector not supported, falling back to jsQR.');
+        requestAnimationFrame(scanQR);
+      }
     };
   } catch(e) {
     console.error("Camera Error:", e.name, e.message);
@@ -1060,10 +1294,28 @@ async function lookupPayUsername() {
   await resolvePayUsername(username);
 }
 
-async function resolvePayUsername(username) {
+async function resolvePayUsername(usernameOrUrl) {
+  let username = usernameOrUrl.trim();
+  try {
+    const url = new URL(username);
+    if (url.searchParams.has('user')) {
+      username = url.searchParams.get('user').trim();
+    }
+  } catch (e) {
+    // Not a URL, assume it's a username. `username` is already correct.
+  }
+
+  if (!username) {
+    toast('Cannot search for an empty username.', 'e');
+    return;
+  }
+
   try {
     const rows = await sb(`profiles?username=eq.${encodeURIComponent(username)}&limit=1`);
-    if (!rows?.length) { toast('Username not found — check and retry', 'e'); return; }
+    if (!rows?.length) { 
+      toast(`User "${esc(username)}" not found.`, 'e'); 
+      return; 
+    }
     foundPayProfile = rows[0];
     document.getElementById('pay-found-card').innerHTML = `
       ${avatarHTML(foundPayProfile.full_name || foundPayProfile.username, foundPayProfile.photo_url, 48)}
@@ -1114,29 +1366,30 @@ function resetPayFound() {
 
   setPayTab('scan');
   if (camStream) { camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
+  barcodeDetector = null;
 }
 
 async function submitPay() {
   const amount = parseFloat(document.getElementById('pay-amount').value);
   const note = document.getElementById('pay-note').value.trim();
-  if (!amount||isNaN(amount)||amount<=0) return toast('Enter a valid amount','e');
+  if (!amount || isNaN(amount) || amount <= 0) return toast('Enter a valid amount', 'e');
   if (!foundPayProfile) return;
-  const btn = document.getElementById('pay-confirm-btn');
-  btn.disabled=true; btn.textContent='Sending…';
-  try {
-    await sb('transactions', {
-      method:'POST',
-      body: JSON.stringify({
-        type:'pay', from_id:ME.id, to_id:foundPayProfile.id, 
-        from_name:ME.full_name || ME.username, to_name:foundPayProfile.full_name || foundPayProfile.username,
-        amount, note, status:'pending'
-      })
-    });
-    closeOverlay('pay-overlay');
-    await loadData();
-    toast(`Payment request sent to ${foundPayProfile.username} ✅`);
-  } catch(e) { toast(e.message||'Failed','e'); }
-  finally { btn.disabled=false; btn.textContent=`Send to ${foundPayProfile?.username||''}`; }
+
+  pendingTxAction = {
+    type: 'pay',
+    details: {
+      to_id: foundPayProfile.id,
+      to_name: foundPayProfile.full_name || foundPayProfile.username,
+      amount,
+      note
+    }
+  };
+
+  promptForPin({
+    action: 'executeTransaction',
+    titleKey: 'pin_tx_title',
+    subtitleKey: 'pin_tx_sub'
+  });
 }
 
 async function searchPayUsers(q) {
@@ -1224,23 +1477,25 @@ function resetReqStep() {
 async function submitRequest() {
   const amount = parseFloat(document.getElementById('req-amount').value);
   const note = document.getElementById('req-note').value.trim();
-  if (!amount||isNaN(amount)||amount<=0) return toast('Enter a valid amount','e');
+  if (!amount || isNaN(amount) || amount <= 0) return toast('Enter a valid amount', 'e');
   if (!foundReqProfile) return;
-  try {
-    await sb('transactions', {
-      method:'POST',
-      body:JSON.stringify({
-        type:'request', from_id:ME.id, to_id:foundReqProfile.id, 
-        from_name:ME.full_name || ME.username, to_name:foundReqProfile.full_name || foundReqProfile.username,
-        amount, note, status:'pending'
-      })
-    });
-    closeOverlay('req-overlay');
-    await loadData();
-    toast(`Debt to ${foundReqProfile.username} recorded ✅`);
-  } catch(e) { toast(e.message||'Failed','e'); }
-}
 
+  pendingTxAction = {
+    type: 'request',
+    details: {
+      to_id: foundReqProfile.id,
+      to_name: foundReqProfile.full_name || foundReqProfile.username,
+      amount,
+      note
+    }
+  };
+
+  promptForPin({
+    action: 'executeTransaction',
+    titleKey: 'pin_tx_title',
+    subtitleKey: 'pin_tx_sub'
+  });
+}
 // ═══════════════════════════════════════════════════════════════════════════
 // REALTIME NOTIFICATIONS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1312,6 +1567,7 @@ function openOverlay(id) { document.getElementById(id).classList.add('open'); }
 function closeOverlay(id) {
   document.getElementById(id).classList.remove('open');
   if (id==='pay-overlay' && camStream) { camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
+  if (id==='pay-overlay') { barcodeDetector = null; }
   // Refresh data when closing major action overlays to reflect any changes.
   if (['pay-overlay', 'req-overlay', 'qr-overlay', 'notif-overlay'].includes(id)) {
     loadData();
@@ -1321,14 +1577,32 @@ function openQR() {
   loadData();
   openOverlay('qr-overlay');
   setTimeout(() => {
-    if (!ME) return;
+    if (!ME || !ME.username) return;
     document.getElementById('qr-token-val').textContent = '@' + ME.username;
-    drawQR('qr-canvas-ov', ME.username || '', 180);
+    
+    // Create a full URL to embed in the QR code.
+    // This allows scanning from outside the app.
+    const siteUrl = 'https://rasin2006.github.io/wll/';
+    const qrValue = `${siteUrl}?user=${ME.username}`;
+    
+    drawQR('qr-canvas-ov', qrValue, 180);
   }, 50);
 }
 
 const navScreens = ['home','history','profile-screen'];
+
 function gotoScreen(id) {
+  const currentScreenEl = document.querySelector('.screen.active');
+  if (currentScreenEl) {
+    const fromId = currentScreenEl.id;
+    if (fromId === 'home' && id !== 'home') {
+      toggleDebtVisibility(false);
+    }
+    if (fromId === 'history' && id !== 'history') {
+      toggleHistoryVisibility(false);
+    }
+  }
+
   // Hide all major screens first
   document.querySelectorAll('.screen').forEach(el => {
     el.style.display = 'none';
@@ -1361,8 +1635,12 @@ function gotoScreen(id) {
 // BOOT
 // ═══════════════════════════════════════════════════════════════════════════
 buildNumpad();
+buildPromptNumpad();
 
 (function boot() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const userFromUrl = urlParams.get('user');
+
   const savedLang = localStorage.getItem('tabify_lang');
   if (savedLang) {
     currentLang = savedLang;
@@ -1377,8 +1655,25 @@ buildNumpad();
       document.getElementById('splash').style.display='none';
       showAuth(false);
       setLanguage(currentLang);
-      const lastScreen = localStorage.getItem('tabify_last_screen');
-      gotoScreen(navScreens.includes(lastScreen) ? lastScreen : 'home');
+
+      if (userFromUrl && userFromUrl !== ME.username) {
+        // If logged in and a user is in the URL, go to pay flow for that user.
+        gotoScreen('home');
+        setTimeout(() => {
+          // Manually open the pay overlay and bypass the tab selection UI
+          openOverlay('pay-overlay');
+          document.querySelector('#pay-overlay .tab-row').style.display = 'none';
+          document.querySelector('#pay-overlay .sheet-sub').style.display = 'none';
+          ['scan', 'type', 'upload'].forEach(t => {
+            document.getElementById('pay-' + t).style.display = 'none';
+          });
+          resolvePayUsername(userFromUrl);
+        }, 300);
+      } else {
+        const lastScreen = localStorage.getItem('tabify_last_screen');
+        gotoScreen(navScreens.includes(lastScreen) ? lastScreen : 'home');
+      }
+
       setupRealtime();
       return;
     } catch {}
@@ -1389,5 +1684,9 @@ buildNumpad();
     showAuth(true);
     document.getElementById('auth').style.display='block';
     setLanguage(currentLang);
+    if (userFromUrl) {
+      // If not logged in, pre-fill the username field on the sign-in screen
+      document.getElementById('id-input').value = userFromUrl;
+    }
   }, 1600);
 })();

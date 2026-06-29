@@ -1,0 +1,20 @@
+{
+  "short_name": "WLL",
+  "name": "W Local Loan",
+  "icons": [
+    {
+      "src": "logo/main_transparent_wll.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "logo/main_transparent_wll.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#0a0e17",
+  "background_color": "#0a0e17"
+}

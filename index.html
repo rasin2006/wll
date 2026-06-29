@@ -5,10 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>WLL</title>
 <link rel="icon" href="logo/submark_icon_wll.png" type="image/png">
+
+<!-- Web App Manifest & PWA settings -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a0e17">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="logo/main_transparent_wll.png">
+
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Khmer:wght@100..900&display=swap" rel="stylesheet">
+<link rel='stylesheet' href='https://cdn-uicons.flaticon.com/2.4.0/uicons-regular-rounded/css/uicons-regular-rounded.css'>
+<link rel='stylesheet' href='https://cdn-uicons.flaticon.com/2.4.0/uicons-regular-solid/css/uicons-regular-solid.css'>
 <link rel="stylesheet" href="styles.css">
 </head>
 <style>
@@ -176,9 +186,9 @@
         </div>
         <div class="home-actions">
           <button class="icon-btn" onclick="openNotif()" id="notif-btn" title="Notifications">
-            🔔<div class="badge" id="notif-badge" style="display:none">0</div>
+            <i class="fi fi-rr-envelope"></i><div class="badge" id="notif-badge" style="display:none">0</div>
           </button>
-          <button class="icon-btn" onclick="openQR()" title="My QR">▣</button>
+          <button class="icon-btn" onclick="openQR()" title="My QR"><i class="fi fi-rs-qr"></i></button>
           <div id="online-indicator" style="display: none; align-items: center; gap: 6px; font-size: 13px; color: #7d8590; margin: 0 8px;">
             <div style="width: 8px; height: 8px; border-radius: 50%; background: #00e5a0; animation: pulse 1s infinite alternate;"></div>
             <div><span id="online-count">0</span> online</div>
@@ -205,43 +215,68 @@
       </div>
       <div class="action-row">
         <button class="action-btn pay-btn-main" onclick="openPay()">
-          <span class="ab-icon">↑</span> 
+          <span class="ab-icon"><i class="fi fi-rr-wallet-arrow"></i></span> 
           <span class="ab-label" data-i18n="pay">Pay</span>
         </button>
         <button class="action-btn req-btn-main" onclick="openRequest()">
-          <span class="ab-icon">💸</span> 
+          <span class="ab-icon"><i class="fi fi-rr-handshake"></i></span> 
           <span class="ab-label" data-i18n="borrow">Borrow</span>
         </button>
       </div>
     </div>
     <div class="section-wrap">
-      <div id="debt-list-wrap"></div>
+      <!-- This button will trigger the PIN prompt -->
+      <div id="reveal-debts-btn" style="padding: 20px 0 0;">
+          <button class="btn-ghost" onclick="promptForPinReveal()" style="width:100%;" data-i18n="show_debt_details">Show Debt Details</button>
+      </div>
+
+      <!-- This container will be hidden by default -->
+      <div id="debt-details-container" style="display: none;">
+          <div id="debt-list-wrap"></div>
+          <button class="btn-ghost" onclick="toggleDebtVisibility(false)" style="width:100%; margin-top: 16px;" data-i18n="hide_debt_details">Hide Debt Details</button>
+      </div>
     </div>
   </div>
 
   <!-- HISTORY -->
   <div id="history" class="screen">
-    <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;margin-bottom:20px" data-i18n="history">History</div>
-    <div id="tx-list"></div>
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;margin-bottom:20px; display: flex; align-items: center; gap: 10px;"><i class="fi fi-rs-time-past"></i><span data-i18n="history">History</span></div>
+    <!-- Reveal Button State -->
+    <div id="history-reveal-container">
+        <div class="empty-state" style="background: #161b22; border-radius: 16px; padding: 40px 20px;">
+            <div style="font-size: 32px; margin-bottom: 12px;"><i class="fi fi-rr-lock"></i></div>
+            <div class="empty-title" data-i18n="history_protected">History Protected</div>
+            <div class="empty-sub" data-i18n="history_protected_sub">Your transaction history is hidden for privacy.</div>
+            <button class="btn-primary" onclick="requestHistoryReveal()" style="margin-top: 20px; width: 100%; max-width: 280px;" data-i18n="reveal_history">Reveal History</button>
+        </div>
+    </div>
+    <!-- Revealed State -->
+    <div id="history-content-container" style="display: none;">
+        <div id="tx-list"></div>
+        <button class="btn-ghost" onclick="toggleHistoryVisibility(false)" style="width:100%; margin-top: 16px;" data-i18n="hide_history">Hide History</button>
+    </div>
   </div>
 
 <!-- PROFILE/MANAGEMENT SCREEN -->
 <div id="profile-screen" class="screen pb-nav">
   <div style="padding: 52px 20px 20px;">
-    <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;margin-bottom:20px;" data-i18n="manage_profile">Manage Profile</div>
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;margin-bottom:20px; display: flex; align-items: center; gap: 10px;">
+      <i class="fi fi-rr-menu-burger"></i>
+      <span data-i18n="manage_profile">Manage Profile</span>
+    </div>
 
     <!-- Display/Edit Wrapper -->
-    <div id="profile-display-wrap">
+    <div id="profile-display-wrap" style="position: relative;">
+        <button class="icon-btn" id="edit-profile-btn" onclick="requestProfileEdit()" title="Edit Profile" style="position: absolute; top: 0; right: 0; font-size: 18px;"><i class="fi fi-rr-user-pen"></i></button>
         <div class="photo-upload" style="margin-bottom: 16px;">
             <div class="photo-circle" id="profile-photo-display" style="width:96px; height:96px; border-style: solid; border-color: #00e5a033;">
                 <!-- avatarHTML will populate this -->
             </div>
         </div>
-        <div style="text-align: center; margin-bottom: 24px;">
+        <div style="text-align: center;">
             <div id="profile-fullname-display" style="font-size: 22px; font-weight: 700;"></div>
             <div id="profile-username-display" style="font-size: 16px; color: #7d8590; margin-top: 4px;"></div>
         </div>
-        <button class="btn-primary" id="edit-profile-btn" onclick="toggleProfileEdit(true)" data-i18n="edit_profile">Edit Profile</button>
       </div>
 
     <div id="profile-edit-form" style="display:none;">
@@ -249,7 +284,7 @@
             <div class="photo-circle" onclick="document.getElementById('profile-photo-file').click()" style="width:96px; height:96px;">
                 <img id="profile-photo-preview" src="" style="display:none; width:96px; height:96px;" alt="">
                 <div id="profile-photo-ph" style="display:flex;flex-direction:column;align-items:center;gap:3px">
-                    <span style="font-size:32px">📷</span><span style="font-size:12px;color:#7d8590">Change</span>
+                    <span style="font-size:32px"><i class="fi fi-rr-add-image"></i></span><span style="font-size:12px;color:#7d8590">Change</span>
                 </div>
             </div>
             <input type="file" id="profile-photo-file" accept="image/*" style="display:none">
@@ -261,22 +296,11 @@
         <button class="btn-ghost" onclick="toggleProfileEdit(false)" style="margin-top:10px" data-i18n="cancel">Cancel</button>
       </div>
 
-    <div class="divider" style="margin: 28px 0;"></div>
-
-    <!-- QR Code Section -->
-    <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;margin-bottom:6px;" data-i18n="your_payment_code">Your payment code</div>
-    <div id="profile-qr-Code<edivr
-    <div style="color:#7d8590;font-size:14px;margin-bottom:20px;" data-i18n="share_qr_sub">Share this so others can pay you.</div>
-      <div class="qr-card" style="width:100%">
-        <div id="profile-qr-avatar"></div>
-        <div id="qr-canvas-profile"></div>
-        <div style="background:#161b22;border-radius:12px;padding:12px 24px;text-align:center; width:100%;">
-          <div style="font-size:11px;color:#7d8590;margin-bottom:4px" data-i18n="username">Your Username</div>
-          <div class="qr-token" id="profile-qr-token-val"></div>
-        </div>
-      </div>
-    <div class="divider" style="margin: 28px 0;"></div>
-    <button class="btn-ghost" onclick="logout()" data-i18n="sign_out" style="width: 100%;">Sign Out</button>
+    <div class="divider" style="margin: 24px 0;"></div>
+    <button class="btn-ghost" onclick="logout()" style="width: 100%; display: flex; align-items: center; justify-content: center;">
+      <i class="fi fi-rr-sign-out-alt" style="margin-right: 8px; font-size: 1.1em; line-height: 1;"></i>
+      <span data-i18n="sign_out">Sign Out</span>
+    </button>
   </div>
   </div>
 
@@ -288,17 +312,35 @@
   <!-- NAVBAR -->
   <div id="navbar" style="display:none">
     <button class="nav-item active" id="nav-home" onclick="gotoScreen('home')">
-      <div class="nav-icon">⌂</div><div class="nav-label" data-i18n="nav_home">Home</div>
+      <div class="nav-icon"><i class="fi fi-rr-home"></i></div><div class="nav-label" data-i18n="nav_home">Home</div>
     </button>
     <button class="nav-item" id="nav-history" onclick="gotoScreen('history')">
-      <div class="nav-icon">↯</div><div class="nav-label" data-i18n="nav_history">History</div>
+      <div class="nav-icon"><i class="fi fi-rs-time-past"></i></div><div class="nav-label" data-i18n="nav_history">History</div>
     </button>
     <button class="nav-item" id="nav-profile-screen" onclick="gotoScreen('profile-screen')">
-      <div class="nav-icon">👤</div><div class="nav-label" data-i18n="nav_profile">Profile</div>
+      <div class="nav-icon"><i class="fi fi-rr-menu-burger"></i></div><div class="nav-label" data-i18n="nav_profile">Profile</div>
     </button>
   </div>
 
 <!-- ══ OVERLAYS ══════════════════════════════════════════════════════════════ -->
+
+<!-- Generic PIN Prompt Overlay -->
+<div class="overlay" id="pin-prompt-overlay" onclick="closePinPrompt()" style="z-index: 2000;">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-title" id="pin-prompt-title" data-i18n="pin_auth_title">Enter PIN</div>
+    <div class="sheet-sub" id="pin-prompt-sub" data-i18n="pin_auth_sub">Please enter your PIN to continue.</div>
+    <div class="pin-section" style="margin-bottom: 16px;">
+      <div class="pin-display" id="prompt-pin-display">
+        <div class="pin-dot" id="ppd0">–</div>
+        <div class="pin-dot" id="ppd1">–</div>
+        <div class="pin-dot" id="ppd2">–</div>
+        <div class="pin-dot" id="ppd3">–</div>
+      </div>
+      <div class="numpad" id="prompt-numpad"></div>
+    </div>
+    <button class="btn-ghost" onclick="closePinPrompt()" data-i18n="cancel">Cancel</button>
+  </div>
+</div>
 
 <!-- Peer History overlay -->
 <div class="overlay" id="peer-history-overlay" onclick="closeOverlay('peer-history-overlay')">
@@ -314,7 +356,7 @@
 <div class="overlay" id="qr-overlay" onclick="closeOverlay('qr-overlay')">
   <div class="sheet" onclick="event.stopPropagation()">
     <div class="sheet-handle"></div>
-    <div class="sheet-title" data-i18n="your_payment_code">Your payment code</div>
+    <div class="sheet-title" style="display: flex; align-items: center; gap: 10px;"><i class="fi fi-rs-qr"></i> <span data-i18n="your_payment_code">Your payment code</span></div>
     <div class="sheet-sub" data-i18n="others_can_scan_this_to_pay_you">Others can scan this to pay you.</div>
     <div class="qr-card">
       <div id="qr-canvas-ov"></div>
@@ -371,16 +413,16 @@
 
     <div class="sheet-sub" data-i18n="pay_sub" style="text-align:center; margin-top:16px;">Scan, type, or upload their QR code</div>
     <div class="tab-row" style="margin-top: 8px;">
-      <button class="tab-btn active" id="tab-scan" onclick="setPayTab('scan')">📷 Scan</button>
-      <button class="tab-btn" id="tab-type" onclick="setPayTab('type')">⌨ Type</button>
-      <button class="tab-btn" id="tab-upload" onclick="setPayTab('upload')">🖼 Upload</button>
+      <button class="tab-btn active" id="tab-scan" onclick="setPayTab('scan')"><i class="fi fi-rs-qr-scan"></i> Scan</button>
+      <button class="tab-btn" id="tab-type" onclick="setPayTab('type')"><i class="fi fi-rr-keyboard-finger"></i> Type</button>
+      <button class="tab-btn" id="tab-upload" onclick="setPayTab('upload')"><i class="fi fi-rr-add-image"></i> Upload</button>
     </div>
 
     <!-- Found user -->
     <div id="pay-found" style="display:none">
       <div class="found-card" id="pay-found-card"></div>
       <div class="field"><label>Amount (រៀល)</label>
-        <input class="amount-input" type="number" id="pay-amount" placeholder="0">
+        <input class="amount-input" type="number" inputmode="numeric" id="pay-amount" placeholder="0">
         <div class="amount-hint">Enter amount in Khmer Riel</div>
       </div>
       <input class="note-input" type="text" id="pay-note" placeholder="Note (optional)">
@@ -405,7 +447,7 @@
     <div id="req-amount-step" style="display:none">
       <div class="found-card" id="req-found-card"></div>
       <div class="field"><label>Amount (រៀល)</label>
-        <input class="amount-input" type="number" id="req-amount" placeholder="0">
+        <input class="amount-input" type="number" inputmode="numeric" id="req-amount" placeholder="0">
         <div class="amount-hint" data-i18n="enter_amount_khmer">Enter amount in Khmer Riel</div>
       </div>
       <input class="note-input" type="text" id="req-note" placeholder="What's this for?">
