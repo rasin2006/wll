@@ -88,29 +88,35 @@
           <span style="font-size:11px;color:#7d8590">Photo</span>
         </div>
       </div>
-      <div class="photo-label">Optional profile photo</div>
+      <div class="photo-label" data-i18n="photo_optional">Optional profile photo</div>
       <input type="file" id="photo-file" accept="image/*" style="display:none">
     </div>
 
     <div class="field" id="signup-fullname" style="display:none">
       <label data-i18n="full_name">Full Name</label>
-      <input type="text" id="fullname-input" placeholder="e.g. Alex King" autocomplete="off">
+      <input type="text" id="fullname-input" data-i18n-attr="placeholder" data-i18n="fullname_placeholder" autocomplete="off">
       <div style="font-size:11px; color:#7d8590; margin-top:4px;" data-i18n="full_name_hint"></div>
     </div>
 
     <div class="field" id="signup-username" style="display:none">
       <label data-i18n="username">Username</label>
-      <input type="text" id="username-input" placeholder="e.g. alex_king" autocomplete="off">
+      <input type="text" id="username-input" data-i18n-attr="placeholder" data-i18n="username_placeholder" autocomplete="off">
       <div style="font-size:11px; color:#7d8590; margin-top:4px;" data-i18n="username_hint"></div>
     </div>
 
-    <div class="field">
+    <div class="field" id="signup-phone" style="display:none">
+      <label data-i18n="phone_number">Phone Number</label>
+      <input type="text" id="phone-input" placeholder="+855..." autocomplete="off" data-i18n-placeholder="phone_number_ph">
+    </div>
+
+    <div class="field" id="login-id-field">
       <label id="id-label" data-i18n="phone_or_username">Phone or username</label>
       <input type="text" id="id-input" placeholder="Phone number or username" autocomplete="off" data-i18n-placeholder="phone_or_username_ph" list="recent-logins">
       <datalist id="recent-logins"></datalist>
+      <div id="forgot-pin-link-container" style="text-align: right; margin-top: 8px;"><span class="forgot-pin-link" onclick="openOverlay('forgot-pin-overlay')" data-i18n="forgot_pin">Forgot PIN?</span></div>
     </div>
 
-    <div class="pin-section">
+    <div class="pin-section" id="main-pin-section">
       <div class="pin-label" id="pin-label" data-i18n="pin_enter">Enter your PIN</div>
       <div class="pin-display" id="pin-display">
         <div class="pin-dot" id="pd0">–</div>
@@ -121,7 +127,7 @@
       <div class="numpad" id="numpad"></div>
     </div>
 
-    <button class="btn-primary" id="auth-btn" onclick="doAuth()" data-i18n="btn_create_account" style="display: none;">Create account</button>
+    <button class="btn-primary" id="auth-btn" onclick="doAuth()" data-i18n="btn_create_account">Create account</button>
 
     <div class="auth-switch" id="auth-switch">New here? <span onclick="toggleMode()">Create account</span></div>
   </div>
@@ -143,7 +149,7 @@
           </button>
           <div id="online-indicator" style="display: none; align-items: center; gap: 6px; font-size: 13px; color: #7d8590; margin: 0 8px;">
             <div style="width: 8px; height: 8px; border-radius: 50%; background: #00e5a0; animation: pulse 1s infinite alternate;"></div>
-            <div><span id="online-count">0</span> online</div>
+            <div><span id="online-count">0</span> <span data-i18n="online_users">online</span></div>
           </div>
           <div class="lang-switcher">
             <button class="lang-btn lang-btn-en active" onclick="setLanguage('en')">EN</button>
@@ -151,7 +157,7 @@
           </div>
         </div>
       </div>
-      <div class="balance-card" onclick="loadDataWithFeedback()" title="Tap to refresh">
+      <div class="balance-card" onclick="loadDataWithFeedback()" data-i18n-attr="title" data-i18n="tap_to_refresh">
         <div class="balance-label" data-i18n="net_position">Net position</div>
         <div class="balance-amount" id="net-balance">0 រៀល</div>
         <div class="balance-row">
@@ -217,13 +223,13 @@
 <div id="profile-screen" class="screen pb-nav">
   <div style="padding: 52px 20px 20px;">
     <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;margin-bottom:20px; display: flex; align-items: center; gap: 10px;">
-      <i class="fi fi-rr-settings"></i>
+      <i class="fi fi-rr-settings"></i> <!-- This line is correct -->
       <span data-i18n="manage_profile">Manage Profile</span>
     </div>
 
     <!-- Display/Edit Wrapper -->
     <div id="profile-display-wrap" style="position: relative;">
-        <button class="icon-btn" id="edit-profile-btn" onclick="toggleProfileEdit(true)" title="Edit Profile" style="position: absolute; top: 0; right: 0; font-size: 18px;"><i class="fi fi-rr-user-pen"></i></button>
+        <button class="icon-btn" id="edit-profile-btn" onclick="toggleProfileEditForm(true)" title="Edit Profile" style="position: absolute; top: 0; right: 0; font-size: 18px;"><i class="fi fi-rr-user-pen"></i></button>
         <div class="photo-upload" style="margin-bottom: 16px;">
             <div class="photo-circle" id="profile-photo-display" style="width:96px; height:96px; border-style: solid; border-color: #00e5a033;">
                 <!-- avatarHTML will populate this -->
@@ -239,7 +245,7 @@
         <div class="photo-upload" style="margin-bottom: 24px;">
             <div class="photo-circle" onclick="document.getElementById('profile-photo-file').click()" style="width:96px; height:96px;">
                 <img id="profile-photo-preview" src="" style="display:none; width:96px; height:96px;" alt="">
-                <div id="profile-photo-ph" style="display:flex;flex-direction:column;align-items:center;gap:3px">
+                <div id="profile-photo-ph" style="display:flex;flex-direction:column;align-items:center;gap:3px" data-i18n="change">
                     <span style="font-size:32px"><i class="fi fi-rr-add-image"></i></span><span style="font-size:12px;color:#7d8590">Change</span>
                 </div>
             </div>
@@ -249,11 +255,22 @@
         <div class="field"><label data-i18n="username">Username</label><input type="text" id="profile-username-input" autocomplete="off"></div>
         <div class="field"><label data-i18n="phone">Phone</label><input type="text" id="profile-phone-input" disabled autocomplete="off"><div style="font-size:11px; color:#7d8590; margin-top:4px;" data-i18n="phone_number_disabled">Phone number cannot be changed.</div></div> 
         <button class="btn-primary" onclick="saveProfileChanges()" data-i18n="save_changes">Save Changes</button>
-        <button class="btn-ghost" onclick="toggleProfileEdit(false)" style="margin-top:10px" data-i18n="cancel">Cancel</button>
+        <button class="btn-ghost" onclick="toggleProfileEditForm(false)" style="margin-top:10px" data-i18n="cancel">Cancel</button>
       </div>
 
     <div class="divider" style="margin: 24px 0;"></div>
-    <button class="btn-ghost" onclick="logout()" style="width: 100%; display: flex; align-items: center; justify-content: center;">
+
+    <!-- Contacts Section -->
+    <div id="profile-contacts-section">
+      <!-- Content will be rendered by renderProfileScreen() in app.js -->
+    </div>
+    <div style="margin-top: 16px;">
+      <button class="btn-ghost" onclick="openAddDemoUserOverlay()" style="width: 100%;"><i class="fi fi-rr-user-add" style="margin-right: 8px;"></i> <span data-i18n="add_demo_contact">Add Demo Contact</span></button>
+    </div>
+
+    <div class="divider" style="margin: 24px 0;"></div>
+
+    <button class="btn-ghost" onclick="logout()" style="width: 100%; display: flex; align-items: center; justify-content: center;" data-i18n-attr="title" data-i18n="sign_out">
       <i class="fi fi-rr-sign-out-alt" style="margin-right: 8px; font-size: 1.1em; line-height: 1;"></i>
       <span data-i18n="sign_out">Sign Out</span>
     </button>
@@ -280,11 +297,96 @@
 
 <!-- ══ OVERLAYS ══════════════════════════════════════════════════════════════ -->
 
+<!-- Forgot PIN Overlay -->
+<div class="overlay" id="forgot-pin-overlay" onclick="closeOverlay('forgot-pin-overlay')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-title" data-i18n="forgot_pin_title">Forgot Your PIN?</div>
+    <div class="sheet-sub" style="margin-bottom: 20px;" data-i18n="forgot_pin_sub">
+      To reset your PIN, please contact the WLL administrator for assistance. They will help you regain access to your account securely.
+    </div>
+    <button class="btn-primary" onclick="closeOverlay('forgot-pin-overlay')" data-i18n="got_it">Got it</button>
+  </div>
+</div>
+
+<!-- Admin PIN Reset Overlay -->
+<div class="overlay" id="admin-pin-reset-overlay" onclick="closeOverlay('admin-pin-reset-overlay')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-title" id="admin-pin-reset-title"></div>
+    <div class="sheet-sub" id="admin-pin-reset-sub" style="margin-bottom: 16px;">Enter a new 4-digit temporary PIN for the user.</div>
+    <div class="field" style="margin-bottom: 20px;">
+        <label style="text-align: center; margin-bottom: 12px;" data-i18n="new_pin_label">New 4-Digit PIN</label>
+        <input type="text" inputmode="numeric" id="admin-new-pin-input" placeholder="••••" maxlength="4" pattern="[0-9]*" style="text-align: center; font-size: 28px; letter-spacing: 0.3em; padding: 12px 10px; max-width: 200px; margin: 0 auto;">
+    </div>
+    <button class="btn-primary" onclick="executeAdminPinReset()" data-i18n="confirm_reset_pin">Confirm & Reset PIN</button>
+    <button class="btn-ghost" onclick="closeOverlay('admin-pin-reset-overlay')" style="margin-top: 10px;" data-i18n="cancel">Cancel</button>
+  </div>
+</div>
+
+<!-- Admin User Edit Overlay -->
+<div class="overlay" id="admin-user-edit-overlay" onclick="closeOverlay('admin-user-edit-overlay')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-title" id="admin-user-edit-title"></div>
+    <div class="sheet-sub" id="admin-user-edit-sub" data-i18n="admin_edit_user_sub">Update user profile information.</div>
+    <div class="field">
+        <label data-i18n="username">Username</label>
+        <input type="text" id="admin-edit-username-input" disabled>
+    </div>
+    <div class="field">
+        <label data-i18n="phone_number">Phone Number</label>
+        <input type="text" id="admin-edit-phone-input" placeholder="+855...">
+    </div>
+    <button class="btn-primary" onclick="executeAdminUserUpdate()" data-i18n="save_changes">Save Changes</button>
+    <button class="btn-ghost" onclick="closeOverlay('admin-user-edit-overlay')" style="margin-top: 10px;" data-i18n="cancel">Cancel</button>
+  </div>
+</div>
+
+<!-- Add Demo User Overlay -->
+<div class="overlay" id="add-demo-user-overlay" onclick="closeOverlay('add-demo-user-overlay')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-title" data-i18n="add_demo_contact">Add Demo Contact</div>
+    <div class="sheet-sub" data-i18n="add_demo_contact_sub">Create a placeholder contact to track debts with someone not yet on WLL.</div>
+    <div class="photo-upload" style="margin-bottom: 24px;">
+        <div class="photo-circle" onclick="document.getElementById('demo-user-photo-file').click()" style="width:82px; height:82px;">
+            <img id="demo-user-photo-preview" src="" style="display:none; width:82px; height:82px;" alt="">
+            <div id="demo-user-photo-ph" style="display:flex;flex-direction:column;align-items:center;gap:3px">
+                <span style="font-size:26px"><i class="fi fi-rr-camera"></i></span><span style="font-size:11px;color:#7d8590">Optional</span>
+            </div>
+        </div>
+        <input type="file" id="demo-user-photo-file" accept="image/*" style="display:none">
+    </div>
+    <div class="field"><label data-i18n="demo_contact_fullname_label">Full Name</label><input type="text" id="demo-user-fullname-input" placeholder="e.g. Samnang Touch" autocomplete="off"></div>
+    <div class="field"><label data-i18n="demo_contact_username_label">Username (auto-generated)</label><input type="text" id="demo-user-username-input" disabled autocomplete="off"></div>
+    <button class="btn-primary" onclick="createDemoUser()" data-i18n="save_demo_contact">Save Demo Contact</button>
+    <button class="btn-ghost" onclick="closeOverlay('add-demo-user-overlay')" style="margin-top:10px" data-i18n="cancel">Cancel</button>
+  </div>
+</div>
+
+<!-- Confirm and Merge Overlay -->
+<div class="overlay" id="confirm-merge-overlay" onclick="closeOverlay('confirm-merge-overlay')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-title" data-i18n="merge_demo_contact">Merge Demo Contact</div>
+    <div class="sheet-sub" id="merge-user-sub">
+      Find the real user account to merge "<strong id="confirm-merge-demo-name" style="color: #e6edf3;"></strong>" into.
+    </div>
+    <div class="field" id="merge-search-field">
+      <label data-i18n="search_for_real_user">Search for Real User</label>
+      <input class="search-input" type="text" id="merge-search-input" data-i18n-attr="placeholder" data-i18n="search_placeholder" oninput="searchMergeUsers(this.value)" autocomplete="off">
+      <div id="merge-search-results" style="margin-top: 10px;"></div>
+    </div>
+    <!-- This section will be shown when a user is selected -->
+    <div id="merge-confirm-section" style="display:none;">
+      <div class="found-card" id="merge-found-card" style="margin-bottom: 20px;"></div>
+      <button class="btn-primary" onclick="sendMergeRequest()" data-i18n="request_merge">Request Merge</button>
+      <button class="btn-ghost" onclick="resetMergeSearch()" style="margin-top:10px" data-i18n="search_again">← Search Again</button>
+    </div>
+  </div>
+</div>
+
 <!-- Generic PIN Prompt Overlay -->
 <div class="overlay" id="pin-prompt-overlay" onclick="closePinPrompt()" style="z-index: 2000;">
-  <div class="sheet" onclick="event.stopPropagation()">
-    <div class="sheet-title" id="pin-prompt-title" data-i18n="pin_auth_title">Enter PIN</div>
-    <div class="sheet-sub" id="pin-prompt-sub" data-i18n="pin_auth_sub">Please enter your PIN to continue.</div>
+  <div class="sheet" onclick="event.stopPropagation();">
+    <div class="sheet-title" id="pin-prompt-title"></div>
+    <div class="sheet-sub" id="pin-prompt-sub"></div>
     <div class="pin-section" style="margin-bottom: 16px;">
       <div class="pin-display" id="prompt-pin-display">
         <div class="pin-dot" id="ppd0">–</div>
@@ -311,8 +413,8 @@
 <!-- QR overlay (from header) -->
 <div class="overlay" id="qr-overlay" onclick="closeOverlay('qr-overlay')">
   <div class="sheet" onclick="event.stopPropagation()">
-    <div class="sheet-handle"></div>
-    <div class="sheet-title" data-i18n="your_payment_code">Your payment code</div>
+    <div class="sheet-handle"></div> <!-- This line is correct -->
+    <div class="sheet-title" data-i18n="your_payment_code"></div>
     <div class="sheet-sub" data-i18n="others_can_scan_this_to_pay_you">Others can scan this to pay you.</div>
     <div class="qr-card">
       <div id="qr-canvas-ov"></div>
@@ -326,7 +428,7 @@
 <!-- Notifications overlay -->
 <div class="overlay" id="notif-overlay" onclick="closeOverlay('notif-overlay')">
   <div class="sheet" onclick="event.stopPropagation()" style="max-height:75vh;overflow-y:auto">
-    <div class="sheet-handle"></div>
+    <div class="sheet-handle"></div> <!-- This line is correct -->
     <div class="sheet-title " data-i18n="notifications">Notifications</div>
     <div id="notif-list" style="margin-top:12px"></div>
   </div>
@@ -335,8 +437,8 @@
 <!-- Pay overlay -->
 <div class="overlay" id="pay-overlay" onclick="closeOverlay('pay-overlay')">
   <div class="sheet" onclick="event.stopPropagation()" style="max-height:90vh;overflow-y:auto">
-    <div class="sheet-handle"></div>
-    <div class="sheet-title" data-i18n="pay">Pay someone</div>
+    <div class="sheet-handle"></div> <!-- This line is correct -->
+    <div class="sheet-title" data-i18n="pay_someone">Pay someone</div>
 
     <!-- Scan -->
     <div id="pay-scan">
@@ -345,12 +447,12 @@
         <canvas id="cam-snapshot" style="display: none;"></canvas>
         <div class="cam-overlay"><div class="cam-frame"><div class="cam-scanline"></div></div></div>
       </div>
-      <button class="btn-primary" id="cam-start-btn" onclick="startCamera()">Open camera</button>
+      <button class="btn-primary" id="cam-start-btn" onclick="startCamera()" data-i18n="open_camera">Open camera</button>
     </div>
 
     <!-- Type -->
     <div id="pay-type" style="display:none">
-      <div class="field"><label>Recipient's Username</label>
+      <div class="field"><label data-i18n="recipient_username">Recipient's Username</label>
         <div class="token-input-row">
           <input class="token-input" id="type-token-input" placeholder="e.g. alex_king" onkeydown="if(event.key==='Enter')lookupPayUsername()" oninput="searchPayUsers(this.value)" autocomplete="off">
           <button class="find-btn" onclick="lookupPayUsername()">Find</button>
@@ -362,29 +464,29 @@
     <!-- Upload -->
     <div id="pay-upload" style="display:none">
       <div class="upload-zone" onclick="document.getElementById('qr-file').click()">
-        <div style="font-size:32px;margin-bottom:8px"><i class="fi fi-rr-qrcode"></i></div>
-        Tap to upload a QR image
+        <div style="font-size:32px;margin-bottom:8px"><i class="fi fi-rr-qrcode"></i></div> <!-- This line is correct -->
+        <span data-i18n="upload_qr_prompt">Tap to upload a QR image</span>
       </div>
       <input type="file" id="qr-file" accept="image/*" style="display:none" onchange="handleQRUpload(event)">
     </div>
 
     <div class="sheet-sub" data-i18n="pay_sub" style="text-align:center; margin-top:16px;">Scan, type, or upload their QR code</div>
     <div class="tab-row" style="margin-top: 8px;">
-      <button class="tab-btn" id="tab-scan" onclick="setPayTab('scan')">Scan</button>
-      <button class="tab-btn active" id="tab-type" onclick="setPayTab('type')">Type</button>
-      <button class="tab-btn" id="tab-upload" onclick="setPayTab('upload')">Upload</button>
+      <button class="tab-btn" id="tab-scan" onclick="setPayTab('scan')" data-i18n="scan">Scan</button>
+      <button class="tab-btn active" id="tab-type" onclick="setPayTab('type')" data-i18n="type">Type</button>
+      <button class="tab-btn" id="tab-upload" onclick="setPayTab('upload')" data-i18n="upload">Upload</button>
     </div>
 
     <!-- Found user -->
     <div id="pay-found" style="display:none">
       <div class="found-card" id="pay-found-card"></div>
-      <div class="field"><label>Amount (រៀល)</label>
-        <input class="amount-input" type="number" inputmode="numeric" id="pay-amount" placeholder="0" autocomplete="off">
-        <div class="amount-hint">Enter amount in Khmer Riel</div>
+      <div class="field"><label data-i18n="amount_khr">Amount (រៀល)</label>
+        <input class="amount-input" type="text" inputmode="numeric" id="pay-amount" placeholder="0" autocomplete="off">
+        <div class="amount-hint" data-i18n="enter_amount_khmer">Enter amount in Khmer Riel</div>
       </div>
-      <input class="note-input" type="text" id="pay-note" placeholder="Note (optional)" autocomplete="off">
-      <button class="btn-primary" id="pay-confirm-btn" onclick="submitPay()">Send payment request</button>
-      <div class="back-link" onclick="resetPayFound()">← Back</div>
+      <input class="note-input" type="text" id="pay-note" data-i18n-attr="placeholder" data-i18n="note_optional_placeholder" autocomplete="off">
+      <button class="btn-primary" id="pay-confirm-btn" onclick="submitPay()" data-i18n="send_payment_request">Send payment request</button>
+      <div class="back-link" onclick="resetPayFound()" data-i18n="back">← Back</div>
     </div>
   </div>
 </div>
@@ -392,8 +494,8 @@
 <!-- Request overlay -->
 <div class="overlay" id="req-overlay" onclick="closeOverlay('req-overlay')">
   <div class="sheet" onclick="event.stopPropagation()" style="max-height:90vh;overflow-y:auto">
-    <div class="sheet-handle"></div>
-    <div class="sheet-title" data-i18n="borrow">Borrow money</div>
+    <div class="sheet-handle"></div> <!-- This line is correct -->
+    <div class="sheet-title" data-i18n="borrow_money">Borrow money</div>
 
     <!-- Scan -->
     <div id="req-scan" style="display:none;">
@@ -402,42 +504,42 @@
         <canvas id="req-cam-snapshot" style="display: none;"></canvas>
         <div class="cam-overlay"><div class="cam-frame"><div class="cam-scanline"></div></div></div>
       </div>
-      <button class="btn-primary" id="req-cam-start-btn" onclick="startReqCamera()">Open camera</button>
+      <button class="btn-primary" id="req-cam-start-btn" onclick="startReqCamera()" data-i18n="open_camera">Open camera</button>
     </div>
 
     <!-- Type -->
     <div id="req-type" style="display:none">
-      <div class="field"><label>Lender's Name or Username</label>
-        <input class="search-input" type="text" id="req-search" placeholder="Username, name, or phone..." oninput="searchUsers(this.value)" autocomplete="off">
+      <div class="field"><label data-i18n="lender_name_label">Lender's Name or Username</label>
+        <input class="search-input" type="text" id="req-search" data-i18n-attr="placeholder" data-i18n="search_placeholder" oninput="searchUsers(this.value)" autocomplete="off">
         <div id="req-results" style="margin-top: 10px;"></div>
       </div>
     </div>
 
     <!-- Upload -->
     <div id="req-upload" style="display:none">
-      <div class="upload-zone" onclick="document.getElementById('req-qr-file').click()">
-        <div style="font-size:32px;margin-bottom:8px"><i class="fi fi-rr-qrcode"></i></div>
-        Tap to upload a QR image
+      <div class="upload-zone" onclick="document.getElementById('req-qr-file').click()" data-i18n="upload_qr_prompt">
+        <div style="font-size:32px;margin-bottom:8px"><i class="fi fi-rr-qrcode"></i></div> <!-- This line is correct -->
+        <span data-i18n="upload_qr_prompt">Tap to upload a QR image</span>
       </div>
       <input type="file" id="req-qr-file" accept="image/*" style="display:none" onchange="handleReqQRUpload(event)">
     </div>
 
     <div class="sheet-sub" data-i18n="find_person_borrow" style="text-align:center; margin-top:16px;">Find the person you need to borrow money from</div>
     <div class="tab-row" style="margin-top: 8px;">
-      <button class="tab-btn" id="req-tab-scan" onclick="setReqTab('scan')">Scan</button>
-      <button class="tab-btn active" id="req-tab-type" onclick="setReqTab('type')">Type</button>
-      <button class="tab-btn" id="req-tab-upload" onclick="setReqTab('upload')">Upload</button>
+      <button class="tab-btn" id="req-tab-scan" onclick="setReqTab('scan')" data-i18n="scan">Scan</button>
+      <button class="tab-btn active" id="req-tab-type" onclick="setReqTab('type')" data-i18n="type">Type</button>
+      <button class="tab-btn" id="req-tab-upload" onclick="setReqTab('upload')" data-i18n="upload">Upload</button>
     </div>
     
     <div id="req-amount-step" style="display:none">
       <div class="found-card" id="req-found-card"></div>
-      <div class="field"><label>Amount (រៀល)</label>
-        <input class="amount-input" type="number" inputmode="numeric" id="req-amount" placeholder="0" autocomplete="off">
+      <div class="field"><label data-i18n="amount_khr">Amount (រៀល)</label>
+        <input class="amount-input" type="text" inputmode="numeric" id="req-amount" placeholder="0" autocomplete="off">
         <div class="amount-hint" data-i18n="enter_amount_khmer">Enter amount in Khmer Riel</div>
       </div>
-      <input class="note-input" type="text" id="req-note" placeholder="What's this for?" autocomplete="off">
-      <button class="btn-primary" onclick="submitRequest()">Record Debt</button>
-      <div class="back-link" onclick="resetReqStep()">← Search again</div>
+      <input class="note-input" type="text" id="req-note" data-i18n-attr="placeholder" data-i18n="note_borrow_placeholder" autocomplete="off">
+      <button class="btn-primary" onclick="submitRequest()" data-i18n="record_debt">Record Debt</button>
+      <div class="back-link" onclick="resetReqStep()" data-i18n="back_search">← Search again</div>
     </div>
   </div>
 </div>

@@ -75,6 +75,15 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .auth-switch{text-align:center;margin-top:20px;font-size:15px;color:#7d8590}
 .auth-switch span{color:#00e5a0;cursor:pointer;font-weight:600}
 
+.forgot-pin-link {
+  color: #7d8590;
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.forgot-pin-link:hover { color: #00e5a0; }
+
 /* ── Nav ── */
 #navbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#0d1117;border-top:1px solid #1c2128;display:none;padding:8px 0 22px;z-index:200}
 .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;padding:4px 0;position:relative}
@@ -132,10 +141,23 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .empty-sub{font-size:14px;line-height:1.5}
 
 /* ── Modals / overlays ── */
-.overlay{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:500;opacity:0;pointer-events:none;transition:opacity .25s;padding:20px}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;z-index:500;opacity:0;pointer-events:none;transition:opacity .25s;padding:20px}
 .overlay.open{opacity:1;pointer-events:all}
-.sheet{background:#161b22;border-radius:24px;width:100%;max-width:440px;padding:20px 24px 28px;transform:scale(.95);transition:transform .3s cubic-bezier(.4,0,.2,1);box-shadow:0 10px 40px #00000088;max-height:90vh;overflow-y:auto}
-.overlay.open .sheet{transform:scale(1)}
+.sheet{background:#161b22;border-radius:24px;width:100%;max-width:440px;padding:20px 24px 28px;transform:scale(.9);opacity:0;transition:transform .3s cubic-bezier(.2, .8, .2, 1.1), opacity .2s;box-shadow:0 10px 40px #00000088;max-height:90vh;overflow-y:auto}
+.overlay.open .sheet{transform:scale(1);opacity:1}
+.pin-display.success .pin-dot.filled {
+  animation: success-flash-anim 0.5s ease-out;
+}
+.pin-display.error .pin-dot {
+  animation: error-flash-anim 0.5s ease-out;
+}
+@keyframes success-flash-anim {
+  50% { background-color: #0f2e1e; border-color: #00e5a0; }
+}
+@keyframes error-flash-anim {
+  50% { background-color: #2e0f0f; border-color: #ff8080; }
+}
+
 .sheet-handle{display:none}
 .sheet-title{font-family:'Space Grotesk',sans-serif;font-size:clamp(18px, 4.6vw, 22px);font-weight:700;margin-bottom:6px}
 .sheet-sub{font-size:14px;color:#7d8590;margin-bottom:22px}
