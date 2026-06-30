@@ -98,6 +98,26 @@ function riel(n) {
   return currentLang === 'km' ? `${formattedNum} រៀល` : `${formattedNum} KHR`;
 }
 
+const DAILY_INTEREST_RATE = 0.01;
+
+function getDebtBalanceWithInterest(debt, asOfDate = new Date()) {
+  const baseAmount = Number(debt?.net_amount || 0);
+  const creditorId = debt?.net_creditor || null;
+  const lastUpdated = debt?.updated_at ? new Date(debt.updated_at) : (debt?.created_at ? new Date(debt.created_at) : new Date());
+  const msSinceUpdate = asOfDate - lastUpdated;
+  const daysElapsed = Math.max(0, Math.floor(msSinceUpdate / 86400000));
+  // Interest always follows the current creditor on the debt row.
+  // If the balance direction flips, the new creditor starts receiving interest from that update onward.
+  const accruedInterest = baseAmount * DAILY_INTEREST_RATE * daysElapsed;
+  return {
+    baseAmount,
+    accruedInterest,
+    daysElapsed,
+    creditorId,
+    totalAmount: Number((baseAmount + accruedInterest).toFixed(2))
+  };
+}
+
 const i18n = {
   en: {
     // Auth
@@ -1278,8 +1298,8 @@ function renderHome() {
   // net: positive = owed to me, negative = I owe
   const owedToMe = allDebts.filter(d => d.net_creditor === ME.id && d.net_amount > 0);
   const iOwe = allDebts.filter(d => d.net_creditor !== ME.id && d.net_amount > 0 && (d.user_a===ME.id||d.user_b===ME.id));
-  const totalOwed = owedToMe.reduce((s,d)=>s+Number(d.net_amount),0);
-  const totalIOwe = iOwe.reduce((s,d)=>s+Number(d.net_amount),0);
+  const totalOwed = owedToMe.reduce((s,d)=>s+getDebtBalanceWithInterest(d).totalAmount,0);
+  const totalIOwe = iOwe.reduce((s,d)=>s+getDebtBalanceWithInterest(d).totalAmount,0);
   const net = totalOwed - totalIOwe;
 
   const netEl = document.getElementById('net-balance');
@@ -1301,14 +1321,16 @@ function renderHome() {
       html += `<div class="section-head" data-i18n="they_owe_you">They owe you</div>`;
       owedToMe.forEach(d => {
         const other = d.user_a === ME.id ? d.user_b_profile : d.user_a_profile;
-        html += debtRow(other.id, other.full_name || other.username, other.photo_url, d.net_amount, true, d.updated_at);
+        const debtBalance = getDebtBalanceWithInterest(d);
+        html += debtRow(other.id, other.full_name || other.username, other.photo_url, debtBalance.totalAmount, true, d.updated_at);
       });
     }
     if (iOwe.length) {
       html += `<div class="section-head mt12" data-i18n="you_owe_section">You owe</div>`;
       iOwe.forEach(d => {
         const other = d.user_a === ME.id ? d.user_b_profile : d.user_a_profile;
-        html += debtRow(other.id, other.full_name || other.username, other.photo_url, d.net_amount, false, d.updated_at);
+        const debtBalance = getDebtBalanceWithInterest(d);
+        html += debtRow(other.id, other.full_name || other.username, other.photo_url, debtBalance.totalAmount, false, d.updated_at);
       });
     }
   }
@@ -1408,7 +1430,8 @@ async function openPeerHistory(otherUserId) {
   let netPositionHTML = '';
   if (debtWithUser && debtWithUser.net_amount > 0) {
       const isOwedToMe = debtWithUser.net_creditor === ME.id;
-      const amount = debtWithUser.net_amount;
+      const debtBalance = getDebtBalanceWithInterest(debtWithUser);
+      const amount = debtBalance.totalAmount;
       const color = isOwedToMe ? '#00e5a0' : '#ff8080';
       const text = isOwedToMe ? t('owes_you_user').replace('{who}', otherUser.username) : t('you_owe_user').replace('{who}', otherUser.username);
 
@@ -1820,7 +1843,8 @@ async function renderAdminScreen() {
 
         allDebts.forEach(debt => {
             const creditorId = debt.net_creditor;
-            const amount = Number(debt.net_amount);
+            const debtBalance = getDebtBalanceWithInterest(debt);
+            const amount = debtBalance.totalAmount;
             const debtorId = debt.user_a === creditorId ? debt.user_b : debt.user_a;
 
             if (userNetPositions[creditorId]) {
