@@ -167,8 +167,11 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .qr-token{font-family:monospace;font-size:26px;font-weight:700;letter-spacing:.15em;color:#00e5a0}
 
 /* ── Notifications ── */
-#notif-overlay .sheet{max-height:70vh;overflow-y:auto}
-.notif-item{background:#0d1117;border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid #1c2128}
+#notif-overlay .sheet{max-height:70vh;overflow-y:auto;animation:notifIn .28s cubic-bezier(.2,.8,.2,1)}
+.notif-item{background:#0d1117;border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid #1c2128;opacity:0;transform:translateY(8px);animation:notifCardIn .25s ease forwards}
+.notif-item:nth-child(2){animation-delay:.04s}
+.notif-item:nth-child(3){animation-delay:.08s}
+.notif-item:nth-child(4){animation-delay:.12s}
 .notif-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .notif-type{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:6px}
 .notif-pay{background:#0f2e1e;color:#00e5a0}
@@ -178,7 +181,34 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .notif-note{font-size:14px;color:#7d8590;margin-bottom:12px}
 .notif-actions{display:flex;gap:8px}
 .notif-accept{flex:1;padding:10px;background:#00e5a0;border:none;border-radius:10px;font-weight:700;color:#0d1117;font-size:15px}
+.notif-accept:disabled,.notif-decline:disabled{opacity:.65;cursor:not-allowed}
 .notif-decline{flex:1;padding:10px;background:#1c2128;border:1px solid #2d333b;border-radius:10px;font-weight:600;color:#7d8590;font-size:15px}
+.notif-item.removing{animation:notifRemove .2s ease forwards}
+
+@keyframes notifIn {
+  from {
+    opacity:0;
+    transform:translateY(10px) scale(0.97);
+  }
+  to {
+    opacity:1;
+    transform:translateY(0) scale(1);
+  }
+}
+
+@keyframes notifCardIn {
+  to {
+    opacity:1;
+    transform:translateY(0);
+  }
+}
+
+@keyframes notifRemove {
+  to {
+    opacity:0;
+    transform:translateY(-6px) scale(0.97);
+  }
+}
 
 /* ── Pay sheet ── */
 .tab-row{display:flex;gap:8px;margin-bottom:20px}

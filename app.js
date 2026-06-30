@@ -213,6 +213,7 @@ const i18n = {
     tx_sent_request: 'You owe {who}',
     tx_recv_request: '{who} requested to borrow',
     notif_pay_desc: '{who} wants to pay you',
+    notif_nudge: '{who} nudged you!',
     notif_request_desc: '{who} requests to borrow from you',
     '2d': '2D',
     accept: 'Accept',
@@ -267,6 +268,7 @@ const i18n = {
     merge_success_toast: 'Merge Success toast',
     no_real_users_found: 'No Real Users Found',
     no_users_found: 'No Users Found',
+    nudge: 'Nudge',
     owes_you: 'Owes you',
     owes_you_user: '{who} owes you',
     pay_request_sent: 'Payment request sent',
@@ -292,6 +294,8 @@ const i18n = {
     someone: 'Someone',
     tx_accepted_toast: 'Tx Accepted toast',
     tx_declined_toast: 'Tx Declined toast',
+    tx_status_changed_accepted: '{who} accepted your request',
+    tx_status_changed_declined: '{who} declined your request',
     tx_failed: 'Tx Failed',
     updating_phone_toast: 'Updating Phone toast',
     user: 'User',
@@ -434,6 +438,7 @@ const i18n = {
     tx_sent_request: 'អ្នកជំពាក់ {who}',
     tx_recv_request: '{who} បានស្នើខ្ចី',
     notif_pay_desc: '{who} ចង់បង់ប្រាក់ឱ្យអ្នក',
+    notif_nudge: '{who} បានស្កิดអ្នក!',
     notif_request_desc: '{who} ស្នើសុំខ្ចីប្រាក់ពីអ្នក',
     all_transactions_between_you: 'ប្រតិបត្តិការទាំងអស់រវាងអ្នក',
     '2d': '២ឌ',
@@ -489,6 +494,7 @@ const i18n = {
     merge_success_toast: 'ការបញ្ចូលបានជោគជ័យ! ប្រវត្តិរបស់អ្នកត្រូវបានធ្វើបច្ចុប្បន្នភាព។',
     no_real_users_found: 'រកមិនឃើញអ្នកប្រើប្រាស់ពិតប្រាកដទេ។',
     no_users_found: 'រកមិនឃើញអ្នកប្រើប្រាស់ទេ',
+    nudge: 'ស្កิด',
     owes_you_user: '{who} ជំពាក់អ្នក',
     pay_request_sent: 'សំណើបង់ប្រាក់បានផ្ញើទៅ {who}។',
     phone_updated_toast: 'លេខទូរស័ព្ទសម្រាប់ {who} ត្រូវបានធ្វើបច្ចុប្បន្នភាព។',
@@ -513,6 +519,8 @@ const i18n = {
     someone: 'នរណាម្នាក់',
     tx_accepted_toast: 'ប្រតិបត្តិការបានយល់ព្រម! បញ្ជីជំពាក់បានធ្វើបច្ចុប្បន្នភាព ✅',
     tx_declined_toast: 'ប្រតិបត្តិការត្រូវបានបដិសេធ',
+    tx_status_changed_accepted: '{who} បានទទួលសំណើរបស់អ្នក',
+    tx_status_changed_declined: '{who} បានបដិសេធសំណើរបស់អ្នក',
     tx_failed: 'ប្រតិបត្តិការបានបរាជ័យ',
     updating_phone_toast: 'កំពុងធ្វើបច្ចុប្បន្នភាពលេខទូរស័ព្ទ...',
     user: 'អ្នកប្រើប្រាស់',
@@ -822,6 +830,16 @@ function getLedgerParticipantsForCurrentUser(txType, currentUserId, fromId, toId
     return { payer_id: toId, payee_id: fromId };
 }
 
+async function broadcastToUser(userId, event, payload) {
+    if (!sbClient || !userId || userId === ME?.id) return;
+    const channel = sbClient.channel(`user-channel-${userId}`);
+    try {
+        await channel.send({ type: 'broadcast', event, payload });
+    } finally {
+        channel.unsubscribe();
+    }
+}
+
 async function executePendingTransaction() {
     if (!pendingTxAction) return;
     const { type, details } = pendingTxAction;
@@ -849,6 +867,15 @@ async function executePendingTransaction() {
         if (isDemoTransaction) {
             const { payer_id, payee_id } = getLedgerParticipantsForCurrentUser(newTx.type, ME.id, newTx.from_id, newTx.to_id);
             await sbRpc('apply_payment', { payer_id, payee_id, amt: newTx.amount });
+        }
+
+        // Send a direct real-time notification, just like a nudge.
+        if (!isDemoTransaction) {
+            await broadcastToUser(to_id, 'new_tx', {
+                from_username: ME.username,
+                from_fullname: ME.full_name,
+                tx: newTx
+            });
         }
 
         if (type === 'pay') {
@@ -1422,6 +1449,10 @@ async function openPeerHistory(otherUserId) {
           <span class="ab-icon"><i class="fi fi-rr-handshake"></i></span> 
           <span class="ab-label" data-i18n="borrow">Borrow</span>
         </button>
+        <button class="action-btn" onclick="sendNudge('${esc(otherUser.id)}')" style="background-color: #2e2a0f; border: 1.5px solid #6e6020; color: #f0a030;">
+          <span class="ab-icon">👋</span>
+          <span class="ab-label" data-i18n="nudge">Nudge</span>
+        </button>
       `;
   }
 
@@ -1443,6 +1474,17 @@ function borrowFromUserInHistory(user) {
     setTimeout(() => {
         openRequest();
         selectReqUser(user);
+    }, 250);
+}
+
+async function sendNudge(toUserId) {
+    if (!toUserId || !sbClient) return;
+    const channel = sbClient.channel(`user-channel-${toUserId}`);
+    toast(`Nudged!`, 's');
+    await channel.send({
+        type: 'broadcast',
+        event: 'nudge',
+        payload: { from_username: ME.username, from_fullname: ME.full_name }
     }, 250);
 }
 
@@ -1956,47 +1998,51 @@ async function openNotif() {
   if (btn.disabled) return;
   btn.disabled = true;
   toast('Loading notifications...', 'i');
-
+  
   try {
-    await loadData(); // This refreshes pendingTx
+    // No need to await loadData() here. The realtime listeners keep pendingTx up-to-date.
+    // We will fetch fresh data in the background *after* showing the overlay.
     const list = document.getElementById('notif-list');
     if (!pendingTx.length) {
       list.innerHTML = '<div class="empty-state" style="padding:24px 0"><div class="empty-icon">✅</div><div class="empty-sub">No pending notifications</div></div>';
     } else {
-      list.innerHTML = pendingTx.map(tx => {
+      list.innerHTML = pendingTx.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).map(tx => {
         const isPay = tx.type === 'pay';
         const label = isPay ? 'PAYMENT' : 'DEBT';
         const cls = isPay ? 'notif-pay' : 'notif-req';
     const who = tx.from_name || t('someone');
         const desc = isPay ? t('notif_pay_desc').replace('{who}', who) : t('notif_request_desc').replace('{who}', who);
-        return `<div class="notif-item">
+        return `<div class="notif-item" id="notif-item-${tx.id}">
       <div class="notif-top"><span class="notif-type ${cls}">${isPay ? t('payment') : t('debt')}</span><span style="font-size:13px;color:#7d8590">${new Date(tx.created_at).toLocaleDateString()}</span></div>
           <div class="notif-who">${desc}</div>
           <div class="notif-amount">${riel(tx.amount)}</div>
           ${tx.note ? `<div class="notif-note">"${esc(tx.note)}"</div>` : ''}
           <div class="notif-actions">
-        <button class="notif-accept" onclick="resolveTransaction('${tx.id}','accepted')" data-i18n="accept">Accept</button>
+        <button class="notif-accept" onclick="resolveTransaction('${tx.id}','accepted', this)" data-i18n="accept">Accept</button>
         <button class="notif-decline" onclick="resolveTransaction('${tx.id}','declined')" data-i18n="decline">Decline</button>
           </div>
         </div>`;
       }).join('');
     }
+    
+    // Open the overlay immediately with current data.
+    openOverlay('notif-overlay');
+
     const mergeRequests = await sb(`merge_requests?real_user_id=eq.${ME.id}&status=eq.pending&select=*,demo_user:demo_user_id(username,full_name),requested_by:requested_by_id(username,full_name)`);
     if (mergeRequests && mergeRequests.length > 0) {
     list.innerHTML = (list.innerHTML.includes('empty-state') ? '' : list.innerHTML) + mergeRequests.map(req => {
         const who = req.requested_by.full_name || req.requested_by.username;
-        return `<div class="notif-item">
+        return `<div class="notif-item" id="notif-item-${req.id}">
         <div class="notif-top"><span class="notif-type" style="background:#1a1a3a; color:#7c6ef5;" data-i18n="merge_notif_label">MERGE</span></div>
         <div class="notif-who">${t('merge_notif_who').replace('{who}', who).replace('{demo_user}', req.demo_user.username)}</div>
         <div class="notif-note" data-i18n="merge_notif_note">All of their transaction history with this demo contact will be transferred to you.</div>
           <div class="notif-actions">
-          <button class="notif-accept" onclick="resolveMergeRequest('${req.id}', 'accepted')" data-i18n="accept_merge">Accept Merge</button>
+          <button class="notif-accept" onclick="resolveMergeRequest('${req.id}', 'accepted', this)" data-i18n="accept_merge">Accept Merge</button>
           <button class="notif-decline" onclick="resolveMergeRequest('${req.id}', 'declined')" data-i18n="decline">Decline</button>
           </div>
         </div>`;
       }).join('');
     }
-    openOverlay('notif-overlay');
   } catch (e) {
     toast(e.message || 'Could not refresh notifications.', 'e');
   } finally {
@@ -2004,16 +2050,27 @@ async function openNotif() {
   }
 }
 
-async function resolveTransaction(txId, status) {
-    pendingPinAction = {
-        action: 'resolveTransaction',
-        details: { txId, status }
-    };
-    promptForPin({
-        ...pendingPinAction,
-        titleKey: 'pin_tx_title',
-        subtitleKey: 'pin_tx_sub'
-    });
+async function resolveTransaction(txId, status, btnEl) {
+    if (status === 'declined') {
+        // Declining does not require a PIN for a smoother user experience.
+        executeResolveTransaction(txId, status);
+    } else if (status === 'accepted') {
+        if (btnEl) {
+            btnEl.disabled = true;
+            const parent = btnEl.closest('.notif-item');
+            if (parent) parent.classList.add('is-processing');
+        }
+        // Accepting a transaction is a financial action and requires PIN confirmation.
+        pendingPinAction = {
+            action: 'resolveTransaction',
+            details: { txId, status }
+        };
+        promptForPin({
+            ...pendingPinAction,
+            titleKey: 'pin_tx_title',
+            subtitleKey: 'pin_tx_sub'
+        });
+    }
 }
 
 async function executeResolveTransaction(txId, status) {
@@ -2024,6 +2081,9 @@ async function executeResolveTransaction(txId, status) {
             method: 'PATCH',
             body: JSON.stringify({ status, resolved_at: new Date().toISOString() })
         });
+        const otherUserId = tx.from_id === ME.id ? tx.to_id : tx.from_id;
+        const otherUserName = tx.from_id === ME.id ? (tx.to_name || t('someone')) : (tx.from_name || t('someone'));
+
         if (status === 'accepted') {
             const { payer_id, payee_id } = getLedgerParticipantsForCurrentUser(tx.type, ME.id, tx.from_id, tx.to_id);
             await sbRpc('apply_payment', {
@@ -2032,26 +2092,57 @@ async function executeResolveTransaction(txId, status) {
                 amt: tx.amount
             });
             toast(t('tx_accepted_toast'));
+            await broadcastToUser(otherUserId, 'tx_status_changed', {
+                from_username: ME.username,
+                from_fullname: ME.full_name,
+                txId,
+                status,
+                who: otherUserName,
+                amount: tx.amount,
+                note: tx.note,
+                txType: tx.type
+            });
+            animateAndRemove(`notif-item-${txId}`, () => { pendingTx = pendingTx.filter(t => t.id !== txId); updateNotifBadge(); });
+            return;
         } else {
             toast(t('tx_declined_toast'));
+            await broadcastToUser(otherUserId, 'tx_status_changed', {
+                from_username: ME.username,
+                from_fullname: ME.full_name,
+                txId,
+                status,
+                who: otherUserName,
+                amount: tx.amount,
+                note: tx.note,
+                txType: tx.type
+            });
+            animateAndRemove(`notif-item-${txId}`, () => { pendingTx = pendingTx.filter(t => t.id !== txId); updateNotifBadge(); });
+            return;
         }
-        closeOverlay('notif-overlay');
-        await loadData();
     } catch (e) {
         toast(e.message || 'Failed to resolve transaction', 'e');
     }
 }
 
-async function resolveMergeRequest(reqId, status) {
-    pendingPinAction = {
-        action: 'resolveMerge',
-        details: { reqId, status }
-    };
-    promptForPin({
-        ...pendingPinAction,
-        titleKey: 'pin_tx_title',
-        subtitleKey: 'pin_tx_sub'
-    });
+async function resolveMergeRequest(reqId, status, btnEl) {
+    if (status === 'declined') {
+        // Declining a merge request does not require a PIN.
+        executeResolveMergeRequest(reqId, status);
+    } else if (status === 'accepted') {
+        if (btnEl) {
+            btnEl.disabled = true;
+            const parent = btnEl.closest('.notif-item');
+            if (parent) parent.classList.add('is-processing');
+        }
+        // Accepting a merge is a significant action and requires PIN confirmation.
+        pendingPinAction = {
+            action: 'resolveMerge',
+            details: { reqId, status }
+        };
+        promptForPin({
+            ...pendingPinAction, titleKey: 'pin_tx_title', subtitleKey: 'pin_tx_sub'
+        });
+    }
 }
 
 async function executeResolveMergeRequest(reqId, status) {
@@ -2065,12 +2156,33 @@ async function executeResolveMergeRequest(reqId, status) {
         if (status === 'accepted') {
             await sbRpc('execute_merge', { p_demo_user_id: req.demo_user_id, p_real_user_id: req.real_user_id });
             toast(t('merge_success_toast'), 's');
+            animateAndRemove(`notif-item-${reqId}`, () => { pendingTx = pendingTx.filter(t => t.id !== reqId); updateNotifBadge(); });
+            return;
         } else {
             toast(t('merge_declined_toast'), 'i');
+            animateAndRemove(`notif-item-${reqId}`, () => { pendingTx = pendingTx.filter(t => t.id !== reqId); updateNotifBadge(); });
+            return;
         }
-        closeOverlay('notif-overlay');
-        await loadData();
     } catch (e) { toast(`Failed to resolve merge: ${e.message}`, 'e'); }
+}
+
+function animateAndRemove(elementId, onComplete) {
+    const itemEl = document.getElementById(elementId);
+    if (!itemEl) return;
+
+    const animationDuration = 200; // Must match CSS animation duration
+    itemEl.classList.add('removing');
+
+    setTimeout(() => {
+        itemEl.remove();
+        if (onComplete) {
+            onComplete();
+        }
+        // After removal, check if the list is now empty
+        if (document.querySelectorAll('#notif-list .notif-item').length === 0) {
+            closeOverlay('notif-overlay');
+        }
+    }, animationDuration);
 }
 // ═══════════════════════════════════════════════════════════════════════════
 // PAY FLOW
@@ -2609,8 +2721,7 @@ async function resolveReqUsername(usernameOrUrl) {
 function setupRealtime() {
   if (!ME || sbClient) return;
 
-  const { createClient } = supabase;
-  sbClient = createClient(SB_URL, SB_KEY);
+  sbClient = supabase.createClient(SB_URL, SB_KEY);
 
   console.log('Setting up realtime subscriptions...');
 
@@ -2619,9 +2730,38 @@ function setupRealtime() {
 
   channel
     // 1. Listen for ANY change to transactions involving the user.
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `or=(from_id.eq.${ME.id},to_id.eq.${ME.id})` }, (payload) => {
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `or=(from_id.eq.${ME.id},to_id.eq.${ME.id})` }, payload => {
         console.log('Realtime: transaction change detected.', payload);
-        playNotificationSound();
+
+        // The 'new_tx' broadcast event now handles the initial notification.
+        // This listener will now primarily handle updates and ensure data consistency.
+
+        // if (payload.eventType === 'INSERT' && payload.new.to_id === ME.id) {
+        //     // A new payment or borrow request was sent to me. Show a toast.
+        //     const who = payload.new.from_name || t('someone');
+        //     const title = payload.new.type === 'pay'
+        //         ? t('notif_pay_desc').replace('{who}', who)
+        //         : t('notif_request_desc').replace('{who}', who);
+        //     const body = `${riel(payload.new.amount)}` + (payload.new.note ? `\nNote: "${payload.new.note}"` : '');
+
+        //     toast(title, 'i');
+        //     playNotificationSound();
+
+        //     // Send a browser notification if the window is not in focus
+        //     if (document.hidden && Notification.permission === 'granted') {
+        //         new Notification(title, {
+        //             body: body,
+        //             icon: '/path/to/your/app_icon.png' // Optional: Add an icon URL
+        //         });
+        //     }
+        /* } else */ if (payload.eventType === 'UPDATE' && payload.new.from_id === ME.id && payload.old.status === 'pending' && payload.new.status !== 'pending') {
+            // A request I sent was just accepted or declined.
+            const toName = payload.new.to_name || t('someone');
+            const statusText = payload.new.status; // 'accepted' or 'declined'
+            toast(t('request_status_updated').replace('{who}', toName).replace('{status}', statusText), 'i');
+            playNotificationSound();
+        }
+
         loadData(); // Reload all data to reflect the change instantly.
     })
     // 3. Listen for ANY change to the debts ledger to keep balances live
@@ -2636,6 +2776,61 @@ function setupRealtime() {
             toast(toastMessage, payload.new.status === 'accepted' ? 's' : 'i');
             playNotificationSound();
             loadData(); // Reload data to reflect the change.
+        }
+    })
+    // 6. Listen for the new direct transaction broadcast events.
+    .on('broadcast', { event: 'new_tx' }, async ({ payload }) => {
+        console.log('Realtime: new_tx broadcast received.', payload);
+        const { from_fullname, from_username, tx } = payload;
+        const who = from_fullname || from_username || t('someone');
+        const title = tx.type === 'pay'
+            ? t('notif_pay_desc').replace('{who}', who)
+            : t('notif_request_desc').replace('{who}', who);
+        const body = `${riel(tx.amount)}` + (tx.note ? `\nNote: "${tx.note}"` : '');
+
+        toast(title, 'i');
+        playNotificationSound();
+
+        if (document.hidden && Notification.permission === 'granted') {
+            const notification = new Notification(title, { body, icon: '/path/to/your/app_icon.png' });
+            setTimeout(() => notification.close(), 3000);
+        }
+
+        // Refresh data to show the new notification in the list.
+        await loadData();
+
+        // If the new transaction is a borrow request, open the notification panel.
+        if (tx.type === 'request' || tx.type === 'pay') {
+            openNotif();
+        }
+    })
+    .on('broadcast', { event: 'tx_status_changed' }, async ({ payload }) => {
+        console.log('Realtime: tx_status_changed received.', payload);
+        const who = payload.from_fullname || payload.from_username || t('someone');
+        const message = payload.status === 'accepted'
+            ? t('tx_status_changed_accepted').replace('{who}', who)
+            : t('tx_status_changed_declined').replace('{who}', who);
+
+        toast(message, payload.status === 'accepted' ? 's' : 'i');
+        playNotificationSound();
+
+        if (document.hidden && Notification.permission === 'granted') {
+            new Notification(message, { icon: '/path/to/your/app_icon.png' });
+        }
+
+        await loadData();
+    })
+    // 5. Listen for direct 'nudge' broadcast events.
+    .on('broadcast', { event: 'nudge' }, ({ payload }) => {
+        console.log('Realtime: nudge received.', payload);
+        const who = payload.from_fullname || payload.from_username || t('someone');
+        const message = t('notif_nudge').replace('{who}', who);
+
+        toast(message, 'i');
+        playNotificationSound();
+
+        if (document.hidden && Notification.permission === 'granted') {
+            new Notification(message, { icon: '/path/to/your/app_icon.png' });
         }
     })
     .subscribe();
