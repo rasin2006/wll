@@ -1090,6 +1090,7 @@ async function doAuth(isCompletingPin = false) {
       saveSession({ id: p.id }, p);
       toast(t('welcome_back_toast').replace('{who}', p.full_name || p.username));
     }
+    requestNotificationPermission();
     await loadData();
     showAuth(false);
     gotoScreen('home');
@@ -1568,7 +1569,7 @@ async function createDemoUser() {
     const payload = {
         id: crypto.randomUUID(),
         full_name: fullname,
-        username: username, // This line is correct
+        username: username,
         photo_url: demoUserPhotoBase64 || null,
         is_demo: true,
         created_by: ME.id
@@ -1587,8 +1588,8 @@ async function createDemoUser() {
         console.warn("Server save failed, saving demo user locally.", e.message);
         const localUsers = getLocalDemoUsers();
         savedUser = { ...payload, created_at: new Date().toISOString() };
-        localUsers.push(savedUser);
-        saveLocalDemoUsers(localUsers); // This line is correct
+        localUsers.push(savedUser); // This line is correct
+        saveLocalDemoUsers(localUsers);
         toast(t('demo_contact_created_offline_toast').replace('{who}', username), 'i');
     } finally {
         closeOverlay('add-demo-user-overlay');
@@ -1634,7 +1635,7 @@ async function searchMergeUsers(q) {
                     ${avatarHTML(p.full_name || p.username, p.photo_url || null, 40)}
                     <div>
                         <div style="font-weight:600;font-size:15px">${esc(p.full_name || p.username)}</div>
-                        <div style="font-size:12px;color:#7d8590">@${esc(p.username)}</div> // This line is correct
+                        <div style="font-size:12px;color:#7d8590">@${esc(p.username)}</div>
                     </div>
                 </div>`).join('');
         } catch (e) {
@@ -1692,7 +1693,7 @@ async function executeSaveProfileChanges(updates) {
     try {
         const [updatedProfile] = await sb(`profiles?id=eq.${ME.id}`, { method: 'PATCH', body: JSON.stringify(updates) });
         Object.assign(ME, updatedProfile);
-        const sess = JSON.parse(localStorage.getItem('tabify_session') || '{}'); // This line is correct
+        const sess = JSON.parse(localStorage.getItem('tabify_session') || '{}');
         if (sess.profile) { Object.assign(sess.profile, updatedProfile); localStorage.setItem('tabify_session', JSON.stringify(sess)); }
         toast(t('profile_updated_toast'), 's');
         toggleProfileEditForm(false);
@@ -1761,7 +1762,7 @@ async function renderAdminScreen() {
 
             return `
                 <div class="debt-item" style="align-items: center; ${indentStyle}">
-                    ${avatarHTML(user.full_name || user.username, user.photo_url, 40)} // This line is correct
+                    ${avatarHTML(user.full_name || user.username, user.photo_url, 40)}
                     <div class="debt-info"><div class="debt-name">${esc(user.username)}</div><div class="debt-meta">${esc(user.phone || (isDemo ? t('demo_account') : t('no_phone')))}</div></div>
                     <div class="debt-right"><div class="debt-val" style="color:${netColor}">${netPrefix}${riel(Math.abs(net))}</div><div class="debt-meta" data-i18n="net_position_admin">Net Position</div></div>
                     ${!isDemo ? `<button class="icon-btn" onclick='promptAdminUserEdit(${JSON.stringify(user)})' style="background: #0f2e1e; border-color: #00e5a0; color: #00e5a0; margin-left: 10px;" data-i18n-attr="title" data-i18n="edit_user"><i class="fi fi-rr-user-pen"></i></button>` : ''}
@@ -1797,8 +1798,8 @@ async function renderAdminScreen() {
         listEl.innerHTML = realUsers.map(user => {
             let userHtml = renderUserRow(user);
             const createdDemoUsers = demoUsersByCreator[user.id];
-            if (createdDemoUsers && createdDemoUsers.length > 0) {
-                userHtml += ` // This line is correct
+            if (createdDemoUsers && createdDemoUsers.length > 0) { // This line is correct
+                userHtml += `
                     <div style="padding-left: 20px; cursor: pointer;" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none';">
                         <span style="font-size: 12px; color: #7d8590;">▶ Show ${createdDemoUsers.length} Demo Accounts</span>
                     </div>
@@ -1849,7 +1850,7 @@ async function executeAdminUserUpdate() {
 }
 
 function promptAdminPinReset(userId, username) {
-    adminTargetUserId = userId; // This line is correct
+    adminTargetUserId = userId;
     adminTargetUsername = username;
     document.getElementById('admin-pin-reset-title').textContent = t('reset_pin_for_user').replace('{who}', username);
     document.getElementById('admin-pin-reset-sub').textContent = t('admin_pin_reset_sub_text');
@@ -2442,7 +2443,7 @@ function selectReqUser(user, usernameArg, fullNameArg, phoneArg, photoArg) {
       <div style="font-size:13px;color:#7d8590">${esc(phone || '')}</div>
     </div>`;
   
-  document.querySelector('#req-overlay .tab-row').style.display = 'none'; // This line is correct
+  document.querySelector('#req-overlay .tab-row').style.display = 'none';
   document.querySelector('#req-overlay .sheet-sub').style.display = 'none';
   ['req-scan', 'req-type', 'req-upload'].forEach(id => document.getElementById(id).style.display = 'none');
   document.getElementById('req-amount-step').style.display='block';
@@ -2617,22 +2618,11 @@ function setupRealtime() {
   const channel = sbClient.channel(`user-channel-${ME.id}`);
 
   channel
-    // 1. Listen for new incoming transactions for toast/pop-up notifications
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transactions', filter: `to_id=eq.${ME.id}` }, (payload) => {
-        console.log('Realtime: new incoming transaction', payload.new);
-        const type = payload.new.type === 'pay' ? 'payment' : 'debt record';
-        playNotificationSound(); // This line is correct
-        toast(`New ${type} from ${payload.new.from_name}!`, 'i');
-        loadData(); // Reload data to get the new transaction
-    })
-    // 2. Listen for updates to transactions you sent (e.g., accepted/declined)
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'transactions', filter: `from_id=eq.${ME.id}` }, (payload) => {
-        if (payload.old.status === 'pending' && payload.new.status !== 'pending') {
-            const toName = payload.new.to_name || 'Someone';
-            toast(t('request_status_updated').replace('{who}', toName).replace('{status}', payload.new.status), 'i');
-            // This is the "trick": reload all data to reflect the change instantly.
-            loadData();
-        }
+    // 1. Listen for ANY change to transactions involving the user.
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `or=(from_id.eq.${ME.id},to_id.eq.${ME.id})` }, (payload) => {
+        console.log('Realtime: transaction change detected.', payload);
+        playNotificationSound();
+        loadData(); // Reload all data to reflect the change instantly.
     })
     // 3. Listen for ANY change to the debts ledger to keep balances live
     .on('postgres_changes', { event: '*', schema: 'public', table: 'debts', filter: `or=(user_a.eq.${ME.id},user_b.eq.${ME.id})` }, () => {
@@ -2664,6 +2654,22 @@ function teardownRealtime() {
     presenceChannel = null;
     sbClient = null;
   }
+}
+
+function requestNotificationPermission() {
+    if ('Notification' in window) {
+        if (Notification.permission === 'granted') {
+            console.log('Notification permission already granted.');
+        } else if (Notification.permission !== 'denied') {
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    console.log('Notification permission granted.');
+                }
+            });
+        }
+    } else {
+        console.log('This browser does not support desktop notification');
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
