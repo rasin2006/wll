@@ -2629,6 +2629,15 @@ function setupRealtime() {
         console.log('Realtime: debt ledger changed, reloading data.');
         loadData();
     })
+    // 4. Listen for updates to merge requests you initiated.
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'merge_requests', filter: `requested_by_id=eq.${ME.id}` }, (payload) => {
+        if (payload.old.status === 'pending' && payload.new.status !== 'pending') {
+            const toastMessage = payload.new.status === 'accepted' ? t('merge_success_toast') : t('merge_declined_toast');
+            toast(toastMessage, payload.new.status === 'accepted' ? 's' : 'i');
+            playNotificationSound();
+            loadData(); // Reload data to reflect the change.
+        }
+    })
     .subscribe();
 
   realtimeChannel = channel;
