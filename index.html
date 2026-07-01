@@ -127,6 +127,8 @@
       <div class="numpad" id="numpad"></div>
     </div>
 
+    <button id="biometric-login-btn" class="btn-ghost" onclick="attemptBiometricLogin()" style="display:none; margin-top:10px; width:100%;" data-i18n="use_biometric_login">Use Face ID / Fingerprint</button>
+
     <button class="btn-primary" id="auth-btn" onclick="doAuth()" data-i18n="btn_create_account">Create account</button>
 
     <div class="auth-switch" id="auth-switch">New here? <span onclick="toggleMode()">Create account</span></div>
@@ -266,6 +268,14 @@
     </div>
     <div style="margin-top: 16px;">
       <button class="btn-ghost" onclick="openAddDemoUserOverlay()" style="width: 100%;"><i class="fi fi-rr-user-add" style="margin-right: 8px;"></i> <span data-i18n="add_demo_contact">Add Demo Contact</span></button>
+    </div>
+
+    <div style="margin-top: 16px;">
+      <button id="pin-bypass-btn" class="btn-ghost" onclick="togglePinBypassMode()" style="width: 100%;" data-i18n="enable_pin_bypass">Disable PIN for 15 minutes</button>
+    </div>
+
+    <div style="margin-top: 16px;">
+      <button id="register-biometric-btn" class="btn-ghost" onclick="registerBiometricLogin()" style="width: 100%;" data-i18n="register_biometric_login">Register Face ID / Fingerprint</button>
     </div>
 
     <div class="divider" style="margin: 24px 0;"></div>
