@@ -113,7 +113,7 @@
       <label id="id-label" data-i18n="phone_or_username">Phone or username</label>
       <input type="text" id="id-input" placeholder="Phone number or username" autocomplete="off" data-i18n-placeholder="phone_or_username_ph" list="recent-logins">
       <datalist id="recent-logins"></datalist>
-      <div id="forgot-pin-link-container" style="text-align: right; margin-top: 8px;"><span class="forgot-pin-link" onclick="openOverlay('forgot-pin-overlay')" data-i18n="forgot_pin">Forgot PIN?</span></div>
+      <div id="forgot-pin-link-container" style="text-align: right; margin-top: 8px;"><span class="forgot-pin-link" onclick="openForgotPinOverlay()" data-i18n="forgot_pin">Forgot PIN?</span></div>
     </div>
 
     <div class="pin-section" id="main-pin-section">
@@ -126,6 +126,8 @@
       </div>
       <div class="numpad" id="numpad"></div>
     </div>
+
+    <button id="biometric-login-btn" class="btn-ghost" onclick="attemptBiometricLogin()" style="display:none; margin-top:10px; width:100%;" data-i18n="use_biometric_login">Use Face ID / Fingerprint</button>
 
     <button class="btn-primary" id="auth-btn" onclick="doAuth()" data-i18n="btn_create_account">Create account</button>
 
@@ -187,13 +189,13 @@
       </div>
     </div>
     <div class="section-wrap">
-      <!-- This button will trigger the PIN prompt -->
-      <div id="reveal-debts-btn" style="padding: 20px 0 0;">
+      <!-- Debt details are visible by default after login -->
+      <div id="reveal-debts-btn" style="padding: 20px 0 0; display:none;">
           <button class="btn-ghost" onclick="promptForPinReveal()" style="width:100%;" data-i18n="show_debt_details">Show Debt Details</button>
       </div>
 
-      <!-- This container will be hidden by default -->
-      <div id="debt-details-container" style="display: none;">
+      <!-- Debt details are shown by default -->
+      <div id="debt-details-container" style="display: block;">
           <div id="debt-list-wrap"></div>
           <button class="btn-ghost" onclick="toggleDebtVisibility(false)" style="width:100%; margin-top: 16px;" data-i18n="hide_debt_details">Hide Debt Details</button>
       </div>
@@ -203,8 +205,8 @@
   <!-- HISTORY -->
   <div id="history" class="screen">
     <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;margin-bottom:20px;" data-i18n="history">History</div>
-    <!-- Reveal Button State -->
-    <div id="history-reveal-container">
+    <!-- History is visible by default after login -->
+    <div id="history-reveal-container" style="display:none;">
         <div class="empty-state" style="background: #161b22; border-radius: 16px; padding: 40px 20px;">
             <div style="font-size: 32px; margin-bottom: 12px;"><i class="fi fi-rr-lock"></i></div>
             <div class="empty-title" data-i18n="history_protected">History Protected</div>
@@ -213,7 +215,7 @@
         </div>
     </div>
     <!-- Revealed State -->
-    <div id="history-content-container" style="display: none;">
+    <div id="history-content-container" style="display: block;">
         <div id="tx-list"></div>
         <button class="btn-ghost" onclick="toggleHistoryVisibility(false)" style="width:100%; margin-top: 16px;" data-i18n="hide_history">Hide History</button>
     </div>
@@ -268,6 +270,14 @@
       <button class="btn-ghost" onclick="openAddDemoUserOverlay()" style="width: 100%;"><i class="fi fi-rr-user-add" style="margin-right: 8px;"></i> <span data-i18n="add_demo_contact">Add Demo Contact</span></button>
     </div>
 
+    <div style="margin-top: 16px;">
+      <button id="pin-bypass-btn" class="btn-ghost" onclick="togglePinBypassMode()" style="width: 100%;" data-i18n="enable_pin_bypass">Disable PIN for 15 minutes</button>
+    </div>
+
+    <div style="margin-top: 16px;">
+      <button id="register-biometric-btn" class="btn-ghost" onclick="registerBiometricLogin()" style="width: 100%;" data-i18n="register_biometric_login">Register Face ID / Fingerprint</button>
+    </div>
+
     <div class="divider" style="margin: 24px 0;"></div>
 
     <button class="btn-ghost" onclick="logout()" style="width: 100%; display: flex; align-items: center; justify-content: center;" data-i18n-attr="title" data-i18n="sign_out">
@@ -300,11 +310,33 @@
 <!-- Forgot PIN Overlay -->
 <div class="overlay" id="forgot-pin-overlay" onclick="closeOverlay('forgot-pin-overlay')">
   <div class="sheet" onclick="event.stopPropagation()">
-    <div class="sheet-title" data-i18n="forgot_pin_title">Forgot Your PIN?</div>
-    <div class="sheet-sub" style="margin-bottom: 20px;" data-i18n="forgot_pin_sub">
+    <div class="sheet-title" id="forgot-pin-title" data-i18n="forgot_pin_title">Forgot Your PIN?</div>
+    <div class="sheet-sub" id="forgot-pin-sub" style="margin-bottom: 16px;" data-i18n="forgot_pin_sub">
       To reset your PIN, please contact the WLL administrator for assistance. They will help you regain access to your account securely.
     </div>
-    <button class="btn-primary" onclick="closeOverlay('forgot-pin-overlay')" data-i18n="got_it">Got it</button>
+
+    <div id="forgot-pin-step1">
+      <div class="field" style="margin-bottom: 16px;">
+        <label data-i18n="phone_or_username">Phone or username</label>
+        <input type="text" id="forgot-pin-identifier" placeholder="Phone number or username" autocomplete="off" data-i18n-placeholder="phone_or_username_ph">
+      </div>
+      <button class="btn-primary" onclick="requestPinResetCode()" data-i18n="send_reset_code">Send verification code</button>
+    </div>
+
+    <div id="forgot-pin-step2" style="display:none;">
+      <div class="sheet-note" id="forgot-pin-code-sent" style="margin-bottom: 14px;"></div>
+      <div class="field" style="margin-bottom: 12px;">
+        <label data-i18n="verification_code">Verification code</label>
+        <input type="text" id="forgot-pin-code-input" inputmode="numeric" placeholder="••••••" maxlength="6" pattern="[0-9]*" autocomplete="off">
+      </div>
+      <div class="field" style="margin-bottom: 20px;">
+        <label data-i18n="new_pin_label">New 4-Digit PIN</label>
+        <input type="text" inputmode="numeric" id="forgot-pin-new-pin-input" placeholder="••••" maxlength="4" pattern="[0-9]*" style="text-align: center;">
+      </div>
+      <button class="btn-primary" onclick="completePinReset()" data-i18n="confirm_reset_pin">Confirm & Reset PIN</button>
+    </div>
+
+    <button class="btn-ghost" onclick="closeOverlay('forgot-pin-overlay')" style="margin-top: 10px;" data-i18n="cancel">Cancel</button>
   </div>
 </div>
 
@@ -534,26 +566,8 @@
     <div id="req-amount-step" style="display:none">
       <div class="found-card" id="req-found-card"></div>
       <div class="field"><label data-i18n="amount_khr">Amount (រៀល)</label>
-        <input class="amount-input" type="text" inputmode="numeric" id="req-amount" placeholder="0" autocomplete="off" oninput="syncReqAmortization()">
+        <input class="amount-input" type="text" inputmode="numeric" id="req-amount" placeholder="0" autocomplete="off">
         <div class="amount-hint" data-i18n="enter_amount_khmer">Enter amount in Khmer Riel</div>
-      </div>
-      <div class="amortization-card">
-        <label class="amortization-toggle">
-          <input type="checkbox" id="req-amortization-toggle" onchange="toggleReqAmortization(this.checked)">
-          <span data-i18n="interest_demo_enable">Show live interest growth</span>
-        </label>
-        <div id="req-amortization-fields" style="display:none; margin-top:12px;">
-          <div class="field" style="margin-bottom:12px;">
-            <label data-i18n="interest_demo_principal">Principal amount (KHR)</label>
-            <input class="amount-input" type="number" step="1" inputmode="numeric" id="req-amortization-rate" value="1000" oninput="syncReqAmortization()" autocomplete="off">
-          </div>
-          <div class="field" style="margin-bottom:12px;">
-            <label data-i18n="interest_demo_rate">Daily interest rate (%)</label>
-            <input class="amount-input" type="number" step="0.1" inputmode="decimal" id="req-amortization-term" value="1" min="0" oninput="syncReqAmortization()" autocomplete="off">
-          </div>
-          <div id="req-amortization-summary" class="amortization-summary"></div>
-          <div id="req-amortization-schedule" class="amortization-schedule"></div>
-        </div>
       </div>
       <input class="note-input" type="text" id="req-note" data-i18n-attr="placeholder" data-i18n="note_borrow_placeholder" autocomplete="off">
       <button class="btn-primary" onclick="submitRequest()" data-i18n="record_debt">Record Debt</button>

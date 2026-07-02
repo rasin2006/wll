@@ -253,18 +253,6 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .search-result.selected{border-color:#00e5a0;background:#0f2e1e}
 .search-result div:first-of-type { font-size: 16px; }
 .search-result div:last-of-type { font-size: 14px; }
-.amortization-card{margin-top:12px;padding:12px;background:#0d1117;border:1px solid #1c2128;border-radius:14px}
-.amortization-toggle{display:flex;align-items:center;gap:10px;color:#e6edf3;font-size:14px;font-weight:600;cursor:pointer}
-.amortization-toggle input{width:16px;height:16px;accent-color:#00e5a0}
-.amortization-summary{margin-top:8px;padding:12px;border-radius:12px;background:#161b22;border:1px solid #21262d;display:grid;gap:6px}
-.amortization-summary-row{display:flex;justify-content:space-between;gap:8px;font-size:14px;color:#7d8590}
-.amortization-summary-row strong{color:#e6edf3}
-.amortization-schedule{margin-top:10px;font-size:13px;color:#7d8590}
-.amortization-schedule table{width:100%;border-collapse:collapse;margin-top:6px}
-.amortization-schedule th,.amortization-schedule td{padding:7px 4px;text-align:left;border-bottom:1px solid #1c2128}
-.amortization-empty{font-size:13px;color:#7d8590;line-height:1.5}
-.field select{width:100%;padding:14px 16px;background:#161b22;border:1.5px solid #21262d;border-radius:12px;color:#e6edf3;font-size:16px;transition:border-color .2s}
-.field select:focus{border-color:#00e5a0}
 
 /* ── History screen ── */
 #history{padding:52px 20px 90px}
