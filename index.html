@@ -127,8 +127,6 @@
       <div class="numpad" id="numpad"></div>
     </div>
 
-    <button id="biometric-login-btn" class="btn-ghost" onclick="attemptBiometricLogin()" style="display:none; margin-top:10px; width:100%;" data-i18n="use_biometric_login">Use Face ID / Fingerprint</button>
-
     <button class="btn-primary" id="auth-btn" onclick="doAuth()" data-i18n="btn_create_account">Create account</button>
 
     <div class="auth-switch" id="auth-switch">New here? <span onclick="toggleMode()">Create account</span></div>
@@ -268,14 +266,6 @@
     </div>
     <div style="margin-top: 16px;">
       <button class="btn-ghost" onclick="openAddDemoUserOverlay()" style="width: 100%;"><i class="fi fi-rr-user-add" style="margin-right: 8px;"></i> <span data-i18n="add_demo_contact">Add Demo Contact</span></button>
-    </div>
-
-    <div style="margin-top: 16px;">
-      <button id="pin-bypass-btn" class="btn-ghost" onclick="togglePinBypassMode()" style="width: 100%;" data-i18n="enable_pin_bypass">Disable PIN for 15 minutes</button>
-    </div>
-
-    <div style="margin-top: 16px;">
-      <button id="register-biometric-btn" class="btn-ghost" onclick="registerBiometricLogin()" style="width: 100%;" data-i18n="register_biometric_login">Register Face ID / Fingerprint</button>
     </div>
 
     <div class="divider" style="margin: 24px 0;"></div>
@@ -544,8 +534,26 @@
     <div id="req-amount-step" style="display:none">
       <div class="found-card" id="req-found-card"></div>
       <div class="field"><label data-i18n="amount_khr">Amount (រៀល)</label>
-        <input class="amount-input" type="text" inputmode="numeric" id="req-amount" placeholder="0" autocomplete="off">
+        <input class="amount-input" type="text" inputmode="numeric" id="req-amount" placeholder="0" autocomplete="off" oninput="syncReqAmortization()">
         <div class="amount-hint" data-i18n="enter_amount_khmer">Enter amount in Khmer Riel</div>
+      </div>
+      <div class="amortization-card">
+        <label class="amortization-toggle">
+          <input type="checkbox" id="req-amortization-toggle" onchange="toggleReqAmortization(this.checked)">
+          <span data-i18n="interest_demo_enable">Show live interest growth</span>
+        </label>
+        <div id="req-amortization-fields" style="display:none; margin-top:12px;">
+          <div class="field" style="margin-bottom:12px;">
+            <label data-i18n="interest_demo_principal">Principal amount (KHR)</label>
+            <input class="amount-input" type="number" step="1" inputmode="numeric" id="req-amortization-rate" value="1000" oninput="syncReqAmortization()" autocomplete="off">
+          </div>
+          <div class="field" style="margin-bottom:12px;">
+            <label data-i18n="interest_demo_rate">Daily interest rate (%)</label>
+            <input class="amount-input" type="number" step="0.1" inputmode="decimal" id="req-amortization-term" value="1" min="0" oninput="syncReqAmortization()" autocomplete="off">
+          </div>
+          <div id="req-amortization-summary" class="amortization-summary"></div>
+          <div id="req-amortization-schedule" class="amortization-schedule"></div>
+        </div>
       </div>
       <input class="note-input" type="text" id="req-note" data-i18n-attr="placeholder" data-i18n="note_borrow_placeholder" autocomplete="off">
       <button class="btn-primary" onclick="submitRequest()" data-i18n="record_debt">Record Debt</button>

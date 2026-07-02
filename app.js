@@ -28,6 +28,8 @@ let barcodeDetector = null;
 let sbClient = null;
 let realtimeChannel = null;
 let presenceChannel = null;
+let reqInterestDemoTimer = null;
+let reqInterestDemoStart = null;
 
 let promptPinVal = '';
 let usernameCheckTimer = null;
@@ -45,8 +47,6 @@ let adminTargetUser = null;
 let inactivityTimer = null;
 const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes
 let appIsLocked = false;
-let pinBypassUntil = null;
-const PIN_BYPASS_DURATION_MS = 15 * 60 * 1000;
 
 const ADMIN_CODE = '*2006*';
 const MAX_RECENT_LOGINS = 5;
@@ -98,37 +98,6 @@ function riel(n) {
   const numStr = String(Number(n || 0).toFixed(0)); // Using toFixed(0) to round to nearest integer for display
   const formattedNum = numStr.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
   return currentLang === 'km' ? `${formattedNum} រៀល` : `${formattedNum} KHR`;
-}
-
-function getImmediatePaymentFee(amount) {
-  const baseAmount = Number(amount || 0);
-  return Number((baseAmount * 0.01).toFixed(2));
-}
-
-function getPaymentAmountWithFee(amount) {
-  const baseAmount = Number(amount || 0);
-  return Number((baseAmount + getImmediatePaymentFee(baseAmount)).toFixed(2));
-}
-
-function getDebtBalanceWithInterest(debt, asOfDate = new Date()) {
-  const baseAmount = Number(debt?.net_amount || 0);
-  const creditorId = debt?.net_creditor || null;
-  const lastUpdated = debt?.updated_at ? new Date(debt.updated_at) : (debt?.created_at ? new Date(debt.created_at) : new Date());
-  const msSinceUpdate = asOfDate - lastUpdated;
-  const daysElapsed = Math.max(0, Math.floor(msSinceUpdate / 86400000));
-  const x = Math.max(1, daysElapsed + 1);
-  const ratePercent = 3.4 - 0.6 * Math.log(x);
-  const dailyInterestRate = Math.max(0.0001, ratePercent / 100);
-  // Interest always follows the current creditor on the debt row.
-  // If the balance direction flips, the new creditor starts receiving interest from that update onward.
-  const accruedInterest = baseAmount * dailyInterestRate * daysElapsed;
-  return {
-    baseAmount,
-    accruedInterest,
-    daysElapsed,
-    creditorId,
-    totalAmount: Number((baseAmount + accruedInterest).toFixed(2))
-  };
 }
 
 const i18n = {
@@ -199,26 +168,20 @@ const i18n = {
     save_changes: 'Save changes',
     cancel: 'Cancel',
     sign_out: 'Sign out',
-    sign_out_confirm: 'Are you sure you want to sign out?',
-    enable_pin_bypass: 'Disable PIN for 15 minutes',
-    pin_bypass_active: 'PIN bypass active for 15 minutes',
-    pin_bypass_title: 'Enter your PIN to enable bypass',
-    pin_bypass_sub: 'Enter your current PIN to disable PIN prompts for 15 minutes.',
-    pin_bypass_enabled_toast: 'PIN prompts are disabled for 15 minutes.',
-    pin_bypass_disabled_toast: 'PIN bypass turned off.',
-    use_biometric_login: 'Use Face ID / Fingerprint',
-    register_biometric_login: 'Register Face ID / Fingerprint',
-    biometric_not_supported: 'Biometric sign-in is not available on this device/browser.',
-    biometric_registered_toast: 'Biometric sign-in is ready on this device.',
-    biometric_login_success: 'Signed in with biometrics.',
-    biometric_login_failed: 'Biometric sign-in could not be completed.',
-    biometric_no_credential: 'No saved biometric sign-in was found for this account.',
-    biometric_error: 'Biometric setup failed.',
     find_person_borrow: 'Find someone to borrow from',
     find_person_pay: 'Find someone to pay',
     enter_amount_khmer: 'Enter amount in KHR',
     show_debt_details: 'Show Debt Details',
     hide_debt_details: 'Hide Debt Details',
+    interest_demo_enable: 'Show live interest growth',
+    interest_demo_principal: 'Principal amount (KHR)',
+    interest_demo_rate: 'Annual interest rate (%)',
+    interest_demo_summary: 'Live interest demo',
+    interest_demo_hint: 'This is an educational demo of how interest can rise in real time using the formula below.',
+    interest_demo_formula: 'Interest per second = Principal × (rate ÷ 365.24×24×60×60)',
+    interest_demo_current: 'Current interest',
+    interest_demo_balance: 'Current balance',
+    interest_demo_elapsed: 'Elapsed time',
     pin_reveal_title: 'Enter PIN to Reveal',
     pin_reveal_sub: 'For your privacy, enter your PIN to view debt details.',
     pin_tx_title: 'Confirm with PIN',
@@ -277,7 +240,6 @@ const i18n = {
     confirm_delete_user: 'Confirm Delete User',
     deleting_user_toast: 'Deleting User toast',
     demo_contact_created_offline_toast: 'Demo Contact Created Offline toast',
-    save_demo_contact: 'Save Demo Contact',
     demo_contact_created_toast: 'Demo Contact Created toast',
     edit_user_title: 'Edit User',
     error_contact_not_found: 'Error: Contact not found',
@@ -434,24 +396,8 @@ const i18n = {
     add_demo_contact_sub: 'បង្កើតគណនីសម្រាប់កត់ត្រាការជំពាក់ជាមួយអ្នកដែលមិនទាន់មានគណនី WLL។',
     demo_contact_fullname_label: 'ឈ្មោះ​ពេញ',
     demo_contact_username_label: 'ឈ្មោះអ្នកប្រើប្រាស់ (បង្កើតដោយស្វ័យប្រវត្តិ)',
-    save_demo_contact: 'រក្សាទុកគណនីសាកល្បង',
     save_changes: 'រក្សាទុកការផ្លាស់ប្តូរ',
     cancel: 'បោះបង់',
-    sign_out_confirm: 'តើអ្នកប្រាកដជាចង់ចាកចេញពីគណនីនេះមែនទេ?',
-    enable_pin_bypass: 'បិទ PIN គ្រប់ 15 នាទី',
-    pin_bypass_active: 'របៀបគ្មាន PIN សកម្មរហូត 15 នាទី',
-    pin_bypass_title: 'បញ្ចូល PIN របស់អ្នកដើម្បីបើករបៀបគ្មាន PIN',
-    pin_bypass_sub: 'បញ្ចូល PIN បច្ចុប្បន្នរបស់អ្នក ដើម្បីបិទការបញ្ចូល PIN រយៈពេល 15 នាទី។',
-    pin_bypass_enabled_toast: 'ការបញ្ចូល PIN ត្រូវបានបិទជាអសកម្ម 15 នាទី។',
-    pin_bypass_disabled_toast: 'របៀបគ្មាន PIN ត្រូវបានបិទ។',
-    use_biometric_login: 'ប្រើ Face ID / Fingerprint',
-    register_biometric_login: 'ចុះឈ្មោះ Face ID / Fingerprint',
-    biometric_not_supported: 'មិនគាំទ្រការចូលដោយជីវមាត្រនៅលើឧបករណ៍/កម្មវិធីនេះទេ។',
-    biometric_registered_toast: 'ការចូលដោយជីវមាត្រត្រៀមរួចរាល់ហើយនៅលើឧបករណ៍នេះ។',
-    biometric_login_success: 'បានចូលដោយជីវមាត្រ។',
-    biometric_login_failed: 'មិនអាចចូលដោយជីវមាត្របានទេ។',
-    biometric_no_credential: 'រកមិនឃើញការចូលដោយជីវមាត្រដែលបានរក្សាទុកសម្រាប់គណនីនេះទេ។',
-    biometric_error: 'ការដំឡើងជីវមាត្របានបរាជ័យ។',
     you_owe_meta: 'អ្នកជំពាក់',
     owes_you: 'ជំពាក់អ្នក',
     paid_you: 'បានសងអ្នក',
@@ -461,6 +407,15 @@ const i18n = {
     sign_out: 'ចាកចេញ',
     show_debt_details: 'បង្ហាញព័ត៌មានលម្អិតអំពីបំណុល',
     hide_debt_details: 'លាក់ព័ត៌មានលម្អិតអំពីបំណុល',
+    interest_demo_enable: 'បង្ហាញការលូតលាស់របស់ការប្រាក់ក្នុងពេលជាក់ស្តែង',
+    interest_demo_principal: 'ចំនួនប្រាក់ដើម (រៀល)',
+    interest_demo_rate: 'អត្រាការប្រាក់ប្រចាំឆ្នាំ (%)',
+    interest_demo_summary: 'ការបង្ហាញការប្រាក់ជាក់ស្តែង',
+    interest_demo_hint: 'នេះគឺជាការបង្ហាញជាការអប់រំអំពីរបៀបដែលការប្រាក់អាចកើនឡើងក្នុងពេលជាក់ស្តែងដោយប្រើរូបមន្តខាងក្រោម។',
+    interest_demo_formula: 'ការប្រាក់ក្នុងមួយវិនាទី = ចំនួនប្រាក់ដើម × (អត្រាការប្រាក់ ÷ 365.24×24×60×60)',
+    interest_demo_current: 'ការប្រាក់បច្ចុប្បន្ន',
+    interest_demo_balance: 'សមតុល្យបច្ចុប្បន្ន',
+    interest_demo_elapsed: 'ពេលវេលាកន្លងទៅ',
     pin_reveal_title: 'បញ្ចូល PIN ដើម្បីបង្ហាញ',
     pin_reveal_sub: 'ដើម្បីសុវត្ថិភាពឯកជនភាពរបស់អ្នក សូមបញ្ចូល PIN ដើម្បីមើលព័ត៌មានលម្អិតអំពីបំណុល។',
     pin_tx_title: 'បញ្ជាក់ជាមួយ PIN',
@@ -503,7 +458,7 @@ const i18n = {
     tx_sent_request: 'អ្នកជំពាក់ {who}',
     tx_recv_request: '{who} បានស្នើខ្ចី',
     notif_pay_desc: '{who} ចង់បង់ប្រាក់ឱ្យអ្នក',
-    notif_nudge: '{who} រាក់ទាក់!',
+    notif_nudge: '{who} បានស្កิดអ្នក!',
     notif_request_desc: '{who} ស្នើសុំខ្ចីប្រាក់ពីអ្នក',
     all_transactions_between_you: 'ប្រតិបត្តិការទាំងអស់រវាងអ្នក',
     '2d': '២ឌ',
@@ -559,7 +514,7 @@ const i18n = {
     merge_success_toast: 'ការបញ្ចូលបានជោគជ័យ! ប្រវត្តិរបស់អ្នកត្រូវបានធ្វើបច្ចុប្បន្នភាព។',
     no_real_users_found: 'រកមិនឃើញអ្នកប្រើប្រាស់ពិតប្រាកដទេ។',
     no_users_found: 'រកមិនឃើញអ្នកប្រើប្រាស់ទេ',
-    nudge: 'រាក់ទាក់',
+    nudge: 'ស្កิด',
     owes_you_user: '{who} ជំពាក់អ្នក',
     pay_request_sent: 'សំណើបង់ប្រាក់បានផ្ញើទៅ {who}។',
     phone_updated_toast: 'លេខទូរស័ព្ទសម្រាប់ {who} ត្រូវបានធ្វើបច្ចុប្បន្នភាព។',
@@ -638,153 +593,6 @@ function getLocalDemoUsers() {
 
 function saveLocalDemoUsers(users) {
   localStorage.setItem('tabify_demo_users', JSON.stringify(users));
-}
-
-function getStoredBiometricCredentials() {
-  try {
-    return JSON.parse(localStorage.getItem('tabify_biometric_credentials') || '[]');
-  } catch {
-    return [];
-  }
-}
-
-function saveStoredBiometricCredentials(credentials) {
-  localStorage.setItem('tabify_biometric_credentials', JSON.stringify(credentials));
-}
-
-function stringToBuffer(str) {
-  if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(str);
-  return Uint8Array.from(unescape(encodeURIComponent(str)), c => c.charCodeAt(0));
-}
-
-function bufferToBase64Url(buffer) {
-  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
-  let binary = '';
-  bytes.forEach(b => binary += String.fromCharCode(b));
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-}
-
-function base64UrlToBuffer(str) {
-  const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
-  const pad = base64.length % 4;
-  const padded = pad ? base64 + '='.repeat(4 - pad) : base64;
-  const binary = atob(padded);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
-
-function isBiometricSupported() {
-  return typeof window !== 'undefined' && !!window.PublicKeyCredential && typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function';
-}
-
-async function registerBiometricLogin() {
-  if (!ME) return;
-  if (!isBiometricSupported()) {
-    toast(t('biometric_not_supported'), 'e');
-    return;
-  }
-
-  try {
-    const available = await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-    if (!available) {
-      toast(t('biometric_not_supported'), 'e');
-      return;
-    }
-
-    const challenge = crypto.getRandomValues(new Uint8Array(32));
-    const publicKey = {
-      challenge,
-      rp: { name: 'WLL' },
-      user: {
-        id: stringToBuffer(ME.id),
-        name: ME.username || ME.phone || ME.id,
-        displayName: ME.full_name || ME.username || ME.phone || 'WLL user'
-      },
-      pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
-      authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
-      timeout: 60000,
-      attestation: 'none'
-    };
-
-    const credential = await navigator.credentials.create({ publicKey });
-    if (!credential) throw new Error(t('biometric_error'));
-
-    const credentialEntry = {
-      profileId: ME.id,
-      username: ME.username || '',
-      phone: ME.phone || '',
-      credentialId: bufferToBase64Url(new Uint8Array(credential.rawId))
-    };
-
-    const existing = getStoredBiometricCredentials().filter(entry => entry.profileId !== ME.id);
-    existing.push(credentialEntry);
-    saveStoredBiometricCredentials(existing);
-    toast(t('biometric_registered_toast'), 's');
-  } catch (e) {
-    console.error(e);
-    toast(e.message || t('biometric_error'), 'e');
-  }
-}
-
-async function attemptBiometricLogin() {
-  if (!isBiometricSupported()) {
-    toast(t('biometric_not_supported'), 'e');
-    return;
-  }
-
-  const idVal = document.getElementById('id-input').value.trim();
-  const credentials = getStoredBiometricCredentials();
-  const matchingCredential = credentials.find(entry => {
-    const target = idVal.toLowerCase();
-    return !target || entry.username?.toLowerCase() === target || entry.phone?.toLowerCase() === target || entry.profileId?.toLowerCase() === target;
-  }) || credentials[0];
-
-  if (!matchingCredential) {
-    toast(t('biometric_no_credential'), 'e');
-    return;
-  }
-
-  try {
-    const challenge = crypto.getRandomValues(new Uint8Array(32));
-    const publicKey = {
-      challenge,
-      timeout: 60000,
-      rpId: window.location.hostname,
-      allowCredentials: [{ id: base64UrlToBuffer(matchingCredential.credentialId), type: 'public-key' }],
-      userVerification: 'required'
-    };
-
-    const assertion = await navigator.credentials.get({ publicKey });
-    if (!assertion) throw new Error(t('biometric_login_failed'));
-
-    const rows = await sb(`profiles?id=eq.${encodeURIComponent(matchingCredential.profileId)}&select=*`);
-    const profile = Array.isArray(rows) ? rows[0] : null;
-    if (!profile) throw new Error(t('biometric_login_failed'));
-
-    saveRecentLogin(profile.username || profile.phone || matchingCredential.profileId);
-    saveSession({ id: profile.id }, profile);
-    toast(t('biometric_login_success'), 's');
-    requestNotificationPermission();
-    await loadData();
-    showAuth(false);
-    gotoScreen('home');
-    setupRealtime();
-  } catch (e) {
-    console.error(e);
-    toast(e.message || t('biometric_login_failed'), 'e');
-  }
-}
-
-function updateBiometricUi() {
-  const loginBtn = document.getElementById('biometric-login-btn');
-  if (loginBtn) {
-    loginBtn.style.display = !isSignup && isBiometricSupported() ? 'block' : 'none';
-  }
-  const registerBtn = document.getElementById('register-biometric-btn');
-  if (registerBtn) {
-    registerBtn.style.display = isBiometricSupported() ? 'block' : 'none';
-  }
 }
 
 function toast(msg, type='s') {
@@ -972,12 +780,6 @@ function checkPromptPin() {
 }
 
 function promptForPin(config) {
-  if (!config || (config.action !== 'createPin' && isPinBypassActive())) {
-    pendingPinAction = config;
-    executePendingPinAction();
-    return;
-  }
-
   pendingPinAction = config;
   if (config.action === 'createPin') {
     const isConfirming = pinCreationStep === 2;
@@ -1000,11 +802,6 @@ function executePendingPinAction() {
     if (pendingPinAction.action === 'unlockApp') {
         appIsLocked = false;
         closeOverlay('pin-prompt-overlay');
-        return;
-    }
-    if (pendingPinAction.action === 'enablePinBypass') {
-        enablePinBypassMode();
-        pendingPinAction = null;
         return;
     }
     const { action, details } = pendingPinAction;
@@ -1063,41 +860,6 @@ async function broadcastToUser(userId, event, payload) {
     }
 }
 
-async function ensureProfileExists(profile, fallbackData = {}) {
-    if (!profile?.id) return null;
-
-    try {
-        const existing = await sb(`profiles?id=eq.${profile.id}&select=id`);
-        const found = Array.isArray(existing) ? existing[0] : existing;
-        if (found?.id) return found;
-    } catch (e) {
-        console.warn('Profile lookup failed:', e.message || e);
-    }
-
-    const payload = {
-        id: profile.id,
-        username: profile.username || fallbackData.username || `user-${String(profile.id).slice(0, 8)}`,
-        full_name: profile.full_name || profile.username || fallbackData.full_name || 'User',
-        phone: profile.phone || fallbackData.phone || null,
-        email: profile.email || fallbackData.email || null,
-        photo_url: profile.photo_url || fallbackData.photo_url || null,
-        pin_hash: profile.pin_hash || fallbackData.pin_hash || null,
-        is_demo: Boolean(profile.is_demo || fallbackData.is_demo),
-        created_by: profile.created_by || fallbackData.created_by || null
-    };
-
-    try {
-        const rows = await sb('profiles', {
-            method: 'POST',
-            body: JSON.stringify(payload)
-        });
-        return Array.isArray(rows) ? rows[0] : rows;
-    } catch (e) {
-        console.warn('Could not create profile row:', e.message || e);
-        return profile;
-    }
-}
-
 async function executePendingTransaction() {
     if (!pendingTxAction) return;
     const { type, details } = pendingTxAction;
@@ -1112,40 +874,19 @@ async function executePendingTransaction() {
     const status = isDemoTransaction ? 'accepted' : 'pending';
 
     try {
-        const currentProfile = await ensureProfileExists(ME, {
-            username: ME?.username || 'user',
-            full_name: ME?.full_name || ME?.username || 'User',
-            is_demo: false,
-            created_by: null
-        });
-        const recipientProfileInput = otherUser || { id: to_id, username: to_name, full_name: to_name, is_demo: isDemoTransaction, created_by: ME?.id || null };
-        const recipientProfile = await ensureProfileExists(recipientProfileInput, {
-            username: to_name || 'demo-user',
-            full_name: to_name || 'Demo User',
-            is_demo: isDemoTransaction,
-            created_by: ME?.id || null
-        });
-        const effectiveFromId = currentProfile?.id || ME?.id;
-        const effectiveToId = recipientProfile?.id || to_id;
-
-        if (!effectiveFromId || !effectiveToId) {
-            throw new Error(t('tx_failed') || 'Unable to prepare the payment record.');
-        }
-
-        const amountToRecord = type === 'pay' ? getPaymentAmountWithFee(amount) : amount;
         const [newTx] = await sb('transactions', {
             method: 'POST',
             body: JSON.stringify({
-                type: type, from_id: effectiveFromId, to_id: effectiveToId,
+                type: type, from_id: ME.id, to_id: to_id,
                 from_name: ME.full_name || ME.username, to_name: to_name,
-                amount: amountToRecord, note, status: status,
+                amount, note, status: status,
                 resolved_at: isDemoTransaction ? new Date().toISOString() : null
             })
         });
 
         if (isDemoTransaction) {
             const { payer_id, payee_id } = getLedgerParticipantsForCurrentUser(newTx.type, ME.id, newTx.from_id, newTx.to_id);
-            await sbRpc('apply_payment', { payer_id, payee_id, amt: amountToRecord });
+            await sbRpc('apply_payment', { payer_id, payee_id, amt: newTx.amount });
         }
 
         // Send a direct real-time notification, just like a nudge.
@@ -1237,7 +978,6 @@ function toggleMode(forceUpdate = false) {
   document.getElementById('signup-username').style.display = isSignup ? 'block' : 'none';
   document.getElementById('signup-phone').style.display = isSignup ? 'block' : 'none';
   document.getElementById('login-id-field').style.display = isSignup ? 'none' : 'block';
-  updateBiometricUi();
   if (!forceUpdate) {
     clearPin();
   }
@@ -1459,7 +1199,6 @@ function showAuth(show) {
   document.getElementById('navbar').style.display = show ? 'none' : 'flex';
   if (show) {
     populateRecentLogins();
-    updateBiometricUi();
   }
 }
 
@@ -1473,74 +1212,11 @@ function setLanguage(lang) {
     b.classList.add('active');
   });
   applyTranslations();
-  updatePinBypassButton();
-  updateBiometricUi();
   if (ME) { loadData(); }
   else { toggleMode(true); }
 }
 
-function loadPinBypassState() {
-  try {
-    const savedUntil = Number(localStorage.getItem('tabify_pin_bypass_until') || 0);
-    if (savedUntil && savedUntil > Date.now()) {
-      pinBypassUntil = savedUntil;
-    } else {
-      pinBypassUntil = null;
-      localStorage.removeItem('tabify_pin_bypass_until');
-    }
-  } catch {
-    pinBypassUntil = null;
-  }
-  updatePinBypassButton();
-}
-
-function isPinBypassActive() {
-  if (!pinBypassUntil) return false;
-  if (Date.now() >= pinBypassUntil) {
-    pinBypassUntil = null;
-    localStorage.removeItem('tabify_pin_bypass_until');
-    updatePinBypassButton();
-    return false;
-  }
-  return true;
-}
-
-function updatePinBypassButton() {
-  const btn = document.getElementById('pin-bypass-btn');
-  if (!btn) return;
-  const active = isPinBypassActive();
-  btn.textContent = active ? t('pin_bypass_active') : t('enable_pin_bypass');
-  btn.classList.toggle('btn-primary', active);
-  btn.classList.toggle('btn-ghost', !active);
-}
-
-function enablePinBypassMode() {
-  pinBypassUntil = Date.now() + PIN_BYPASS_DURATION_MS;
-  localStorage.setItem('tabify_pin_bypass_until', String(pinBypassUntil));
-  updatePinBypassButton();
-  toast(t('pin_bypass_enabled_toast'), 's');
-}
-
-function togglePinBypassMode() {
-  if (isPinBypassActive()) {
-    pinBypassUntil = null;
-    localStorage.removeItem('tabify_pin_bypass_until');
-    updatePinBypassButton();
-    toast(t('pin_bypass_disabled_toast'), 'i');
-    return;
-  }
-
-  promptForPin({
-    action: 'enablePinBypass',
-    titleKey: 'pin_bypass_title',
-    subtitleKey: 'pin_bypass_sub'
-  });
-}
-
 function logout() {
-  const confirmed = window.confirm(t('sign_out_confirm'));
-  if (!confirmed) return;
-
   if (camStream) { camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
   localStorage.removeItem('tabify_session');
   localStorage.removeItem('tabify_last_screen');
@@ -1622,8 +1298,8 @@ function renderHome() {
   // net: positive = owed to me, negative = I owe
   const owedToMe = allDebts.filter(d => d.net_creditor === ME.id && d.net_amount > 0);
   const iOwe = allDebts.filter(d => d.net_creditor !== ME.id && d.net_amount > 0 && (d.user_a===ME.id||d.user_b===ME.id));
-  const totalOwed = owedToMe.reduce((s,d)=>s+getDebtBalanceWithInterest(d).totalAmount,0);
-  const totalIOwe = iOwe.reduce((s,d)=>s+getDebtBalanceWithInterest(d).totalAmount,0);
+  const totalOwed = owedToMe.reduce((s,d)=>s+Number(d.net_amount),0);
+  const totalIOwe = iOwe.reduce((s,d)=>s+Number(d.net_amount),0);
   const net = totalOwed - totalIOwe;
 
   const netEl = document.getElementById('net-balance');
@@ -1645,16 +1321,14 @@ function renderHome() {
       html += `<div class="section-head" data-i18n="they_owe_you">They owe you</div>`;
       owedToMe.forEach(d => {
         const other = d.user_a === ME.id ? d.user_b_profile : d.user_a_profile;
-        const debtBalance = getDebtBalanceWithInterest(d);
-        html += debtRow(other.id, other.full_name || other.username, other.photo_url, debtBalance.totalAmount, true, d.updated_at);
+        html += debtRow(other.id, other.full_name || other.username, other.photo_url, d.net_amount, true, d.updated_at);
       });
     }
     if (iOwe.length) {
       html += `<div class="section-head mt12" data-i18n="you_owe_section">You owe</div>`;
       iOwe.forEach(d => {
         const other = d.user_a === ME.id ? d.user_b_profile : d.user_a_profile;
-        const debtBalance = getDebtBalanceWithInterest(d);
-        html += debtRow(other.id, other.full_name || other.username, other.photo_url, debtBalance.totalAmount, false, d.updated_at);
+        html += debtRow(other.id, other.full_name || other.username, other.photo_url, d.net_amount, false, d.updated_at);
       });
     }
   }
@@ -1754,8 +1428,7 @@ async function openPeerHistory(otherUserId) {
   let netPositionHTML = '';
   if (debtWithUser && debtWithUser.net_amount > 0) {
       const isOwedToMe = debtWithUser.net_creditor === ME.id;
-      const debtBalance = getDebtBalanceWithInterest(debtWithUser);
-      const amount = debtBalance.totalAmount;
+      const amount = debtWithUser.net_amount;
       const color = isOwedToMe ? '#00e5a0' : '#ff8080';
       const text = isOwedToMe ? t('owes_you_user').replace('{who}', otherUser.username) : t('you_owe_user').replace('{who}', otherUser.username);
 
@@ -2167,8 +1840,7 @@ async function renderAdminScreen() {
 
         allDebts.forEach(debt => {
             const creditorId = debt.net_creditor;
-            const debtBalance = getDebtBalanceWithInterest(debt);
-            const amount = debtBalance.totalAmount;
+            const amount = Number(debt.net_amount);
             const debtorId = debt.user_a === creditorId ? debt.user_b : debt.user_a;
 
             if (userNetPositions[creditorId]) {
@@ -2839,6 +2511,93 @@ function selectPayUser(username) {
 // ═══════════════════════════════════════════════════════════════════════════
 // REQUEST FLOW (now "Owe")
 // ═══════════════════════════════════════════════════════════════════════════
+function getReqInterestDemo() {
+  const enabled = document.getElementById('req-amortization-toggle')?.checked;
+  if (!enabled) return null;
+
+  const amountEl = document.getElementById('req-amount');
+  const principalEl = document.getElementById('req-amortization-rate');
+  const rateEl = document.getElementById('req-amortization-term');
+
+  if (!amountEl || !principalEl || !rateEl) return null;
+
+  const principal = parseFloat((amountEl.value || '').replace(/\s/g, ''));
+  const demoPrincipal = parseFloat(principalEl.value);
+  const dailyRate = parseFloat(rateEl.value);
+
+  if (!principal || isNaN(principal) || principal <= 0 || !demoPrincipal || isNaN(demoPrincipal) || demoPrincipal <= 0 || isNaN(dailyRate) || dailyRate < 0) {
+    return null;
+  }
+
+  const secondsPerDay = 24 * 60 * 60;
+  const interestPerSecond = demoPrincipal * (dailyRate / 100 / secondsPerDay);
+  const elapsedSeconds = reqInterestDemoStart ? Math.max(0, Math.floor((Date.now() - reqInterestDemoStart) / 1000)) : 0;
+  const currentInterest = interestPerSecond * elapsedSeconds;
+  const currentBalance = demoPrincipal + currentInterest;
+
+  return {
+    principal: demoPrincipal,
+    dailyRate,
+    interestPerSecond,
+    elapsedSeconds,
+    currentInterest,
+    currentBalance
+  };
+}
+
+function syncReqAmortization() {
+  const enabled = document.getElementById('req-amortization-toggle')?.checked;
+  if (!enabled) return;
+
+  const summaryEl = document.getElementById('req-amortization-summary');
+  const scheduleEl = document.getElementById('req-amortization-schedule');
+  if (!summaryEl || !scheduleEl) return;
+
+  const demo = getReqInterestDemo();
+  if (!demo) {
+    summaryEl.innerHTML = `<div class="amortization-empty">${t('interest_demo_hint')}</div>`;
+    scheduleEl.innerHTML = '';
+    return;
+  }
+
+  const elapsed = `${Math.floor(demo.elapsedSeconds / 60)}m ${demo.elapsedSeconds % 60}s`;
+  summaryEl.innerHTML = `
+    <div style="font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#7d8590;margin-bottom:6px;">${t('interest_demo_summary')}</div>
+    <div class="amortization-summary-row"><span>${t('interest_demo_current')}</span><strong>${riel(demo.currentInterest)}</strong></div>
+    <div class="amortization-summary-row"><span>${t('interest_demo_balance')}</span><strong>${riel(demo.currentBalance)}</strong></div>
+    <div class="amortization-summary-row"><span>${t('interest_demo_elapsed')}</span><strong>${elapsed}</strong></div>
+  `;
+
+  scheduleEl.innerHTML = `
+    <div style="font-size:13px;line-height:1.5;color:#7d8590;margin-top:6px;">${t('interest_demo_formula')}</div>
+    <div style="font-size:13px;line-height:1.5;color:#7d8590;margin-top:6px;">${t('interest_demo_hint')}</div>
+  `;
+}
+
+function toggleReqAmortization(enabled) {
+  const fields = document.getElementById('req-amortization-fields');
+  if (!fields) return;
+
+  fields.style.display = enabled ? 'block' : 'none';
+  if (!enabled) {
+    if (reqInterestDemoTimer) {
+      clearInterval(reqInterestDemoTimer);
+      reqInterestDemoTimer = null;
+    }
+    reqInterestDemoStart = null;
+    document.getElementById('req-amortization-summary').innerHTML = '';
+    document.getElementById('req-amortization-schedule').innerHTML = '';
+    return;
+  }
+
+  reqInterestDemoStart = Date.now();
+  if (reqInterestDemoTimer) clearInterval(reqInterestDemoTimer);
+  reqInterestDemoTimer = setInterval(() => {
+    syncReqAmortization();
+  }, 10000);
+  syncReqAmortization();
+}
+
 function openRequest() {
   loadData();
   resetReqStep();
@@ -2916,6 +2675,17 @@ function resetReqStep() {
   document.getElementById('req-amount-step').style.display='none';
   document.getElementById('req-amount').value='';
   document.getElementById('req-note').value='';
+  document.getElementById('req-amortization-toggle').checked = false;
+  document.getElementById('req-amortization-fields').style.display = 'none';
+  document.getElementById('req-amortization-rate').value = '1000';
+  document.getElementById('req-amortization-term').value = '10';
+  document.getElementById('req-amortization-summary').innerHTML = '';
+  document.getElementById('req-amortization-schedule').innerHTML = '';
+  if (reqInterestDemoTimer) {
+    clearInterval(reqInterestDemoTimer);
+    reqInterestDemoTimer = null;
+  }
+  reqInterestDemoStart = null;
   
   if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
   barcodeDetector = null;
@@ -2928,6 +2698,8 @@ async function submitRequest() {
   const note = document.getElementById('req-note').value.trim();
   if (!amount || isNaN(amount) || amount <= 0) return toast(t('error_invalid_amount'), 'e');
   if (!foundReqProfile) return;
+
+  const amortization = getReqAmortizationPlan();
   
   pendingTxAction = {
     type: 'request',
@@ -2935,7 +2707,8 @@ async function submitRequest() {
       to_id: foundReqProfile.id,
       to_name: foundReqProfile.full_name || foundReqProfile.username,
       amount,
-      note
+      note,
+      amortization
     }
   };
 
@@ -3297,12 +3070,29 @@ function gotoScreen(id) {
 }
 
 function resetInactivityTimer() {
+    if (appIsLocked) return;
     clearTimeout(inactivityTimer);
-    inactivityTimer = null;
+    inactivityTimer = setTimeout(() => {
+        console.log("User inactive for 15 minutes. Locking app.");
+        appIsLocked = true;
+        promptForPin({
+            action: 'unlockApp',
+            titleKey: 'session_expired_title',
+            subtitleKey: 'session_expired_sub'
+        });
+        // Make the overlay non-dismissible
+        const pinOverlay = document.getElementById('pin-prompt-overlay');
+        pinOverlay.onclick = null; // Remove the close handler
+        const cancelButton = pinOverlay.querySelector('.btn-ghost');
+        if (cancelButton) cancelButton.style.display = 'none';
+
+    }, INACTIVITY_TIMEOUT);
 }
 
 function setupActivityListeners() {
-    // PIN is only required for login and payment/authorization flows.
+    ['click', 'keydown', 'touchstart'].forEach(eventType => {
+        window.addEventListener(eventType, resetInactivityTimer, true);
+    });
 }
 // ═══════════════════════════════════════════════════════════════════════════
 // BOOT
@@ -3371,7 +3161,6 @@ buildPromptNumpad();
       document.getElementById('splash').style.display='none';
       showAuth(false);
       setLanguage(currentLang);
-      loadPinBypassState();
 
       if (userFromUrl && userFromUrl !== ME.username) {
         // If logged in and a user is in the URL, go to pay flow for that user.
@@ -3392,6 +3181,8 @@ buildPromptNumpad();
       }
 
       setupRealtime();
+      resetInactivityTimer();
+      setupActivityListeners();
       return;
     } catch {}
   }
@@ -3401,7 +3192,6 @@ buildPromptNumpad();
     showAuth(true);
     document.getElementById('auth').style.display='block';
     setLanguage(currentLang);
-    loadPinBypassState();
     if (userFromUrl) {
       // If not logged in, pre-fill the username field on the sign-in screen
       document.getElementById('id-input').value = userFromUrl;
